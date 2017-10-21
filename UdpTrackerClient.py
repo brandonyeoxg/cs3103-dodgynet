@@ -1,36 +1,20 @@
 from builtins import dict
-from urllib.parse import urlparse
 from random import randint
 import socket
 import struct
 import time
+from .UdpTrackerCommons import *
 from .TrackerException import TrackerRequestException, TrackerResponseException
 
-"""according to http://www.rasterbar.com/products/libtorrent/udp_tracker_protocol.html"""
-DEFAULT_CONNECTION_ID = 0x41727101980
-DEFAULT_TIMEOUT = 2
-
-JOIN = 0
-ANNOUNCE = 1
-ERROR = 2
-
-
-def parseurl(url):
-    parsed = urlparse(url)
-    return parsed.hostname, parsed.port
-
-
 """
-    Tracker for working with udp based tracking protocol
+    Tracker for working with udp based tracking protocol on the client side
 
     To initialise call
 
     tracker = UDPTracker(<url/localhost of initial seeder>, <timeout=2>, <infohash>)
     tracker.connect()
 """
-
-
-class UdpTracker:
+class UdpTrackerClient:
     announce_fields = [
         "peer_id",
         "downloaded",
@@ -73,7 +57,7 @@ class UdpTracker:
     def announce(self):
         arguments = dict.fromkeys(self.announce_fields)
         arguments['peer_id'] = self.peer_id
-        arguments['port'] = 6800
+        arguments['port'] = DEFAULT_PORT
         arguments['num_want'] = 10
         values = [arguments[a] for a in self.announce_fields]
         payload = struct.pack('!20sQQQLLLH', *values)
@@ -114,10 +98,10 @@ class UdpTracker:
         return self.connection_id
 
     def process_announce(self, payload):
-        info_struct = '!LLL'
+        info_struct = '!L'
         info_size = struct.calcsize(info_struct)
         info = payload[:info_size]
-        interval, leechers, seeders = struct.unpack(info_struct, info)
+        interval = struct.unpack(info_struct, info)
 
         peer_data = payload[info_size:]
         peer_struct = '!LH'
@@ -135,8 +119,6 @@ class UdpTracker:
             })
 
         return dict(interval=interval,
-                    leechers=leechers,
-                    seeders=seeders,
                     peers=peers)
 
     def process_error(self, payload):
