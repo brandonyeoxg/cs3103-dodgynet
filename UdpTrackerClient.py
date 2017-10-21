@@ -3,8 +3,8 @@ from random import randint
 import socket
 import struct
 import time
-from .UdpTrackerCommons import *
-from .TrackerException import TrackerRequestException, TrackerResponseException
+from UdpTrackerCommons import *
+from TrackerException import TrackerRequestException, TrackerResponseException
 
 """
     Tracker for working with udp based tracking protocol on the client side
@@ -26,8 +26,9 @@ class UdpTrackerClient:
         "port"
     ]
 
-    def __init__(self, initial_seeder_url):
-        self.host, self.port = parseurl(initial_seeder_url)
+    def __init__(self, host = 'localhost', port = DEFAULT_PORT):
+        self.host = host
+        self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.peer_id = self.host
         self.connection_id = DEFAULT_CONNECTION_ID
@@ -36,7 +37,7 @@ class UdpTrackerClient:
 
     def send(self, action, payload=None):
         if not payload:
-            payload = ''
+            payload = b''
         trans_id, header = self.build_header(action)
         self.transactions[trans_id] = trans = {
             'action': action,
@@ -66,7 +67,7 @@ class UdpTrackerClient:
     def listen_for_response(self):
         self.sock.settimeout(self.timeout)
         try:
-            response = self.sock.recv(10240)
+            response = self.sock.recv(1024)
         except socket.timeout:
             return dict()
 

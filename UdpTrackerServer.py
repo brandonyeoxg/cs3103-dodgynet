@@ -2,7 +2,7 @@ import socket
 import struct
 import time
 from ipaddress import ip_address
-from .UdpTrackerCommons import *
+from UdpTrackerCommons import *
 
 """
     Tracker for working with udp based tracking protocol on the server side
@@ -21,6 +21,8 @@ class UdpTrackerServer:
                  refresh_interval: int = 300,
                  conn_valid_interval: int = DEFAULT_TIMEOUT):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        hostname = socket.gethostbyname(host)
+        self.sock.bind((hostname, port))
         self.peer_id = socket.gethostbyname(socket.gethostname())
         self.peer_list = []
         self.connections = []
@@ -30,7 +32,8 @@ class UdpTrackerServer:
 
     def run_server_tracker(self):
         self.cull_connections()
-        self.listen_for_request()
+        print("waiting for connections")
+        print (self.listen_for_request())
 
     def cull_connections(self):
         server_time = time.time()
@@ -45,15 +48,14 @@ class UdpTrackerServer:
 
 
     def listen_for_request(self):
-        request, addr = self.sock.recvfrom(10240)
+        request, addr = self.sock.recvfrom(1024)
         request_header = request[:12]
         payload = request[12:]
         conn_id = request_header[:8]
         action = request_header[8:]
 
-        trans = []
-        trans['response'] = self.process_request(action, conn_id, payload)
-        trans['completed'] = True
+        trans = {'action': action, 'time': time.time(), 'payload': payload, 'complete': False,
+                 'response': self.process_request(addr, action, conn_id, payload), 'completed': True}
         return trans
 
     def send(self, addr, action, transaction_id, payload=None):
