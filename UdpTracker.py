@@ -1,14 +1,16 @@
+from builtins import dict
 from urllib.parse import urlparse
 from random import randint
 import socket
 import struct
 import time
+from .TrackerException import TrackerRequestException, TrackerResponseException
 
 """according to http://www.rasterbar.com/products/libtorrent/udp_tracker_protocol.html"""
 DEFAULT_CONNECTION_ID = 0x41727101980
 DEFAULT_TIMEOUT = 2
 
-CONNECT = 0
+JOIN = 0
 ANNOUNCE = 1
 ERROR = 2
 
@@ -45,9 +47,42 @@ class UdpTracker:
         return trans
 
 
-    def build_header(self):
+    def build_header(self, action):
         transaction_id = randint(0, 1 << 32 - 1)
         return transaction_id, struct.pack('!QLL', self.connection_id, action, transaction_id)
 
     def join(self):
-        return self.send(CONNECT)
+        return self.send(JOIN)
+
+    def listen_for_response(self):
+        self.sock.settimeout(self.timeout)
+
+        try:
+            response = self.sock.recv(10240)
+        except socket.timeout:
+            return dict()
+
+        headers = response[:8]
+        payload = response[8:]
+
+        action, trans_id = struct.unpack("!LL", headers)
+
+        try:
+            trans = self.transactions[trans_id]
+        except KeyError:
+            raise TrackerResponseException("Invalid Transaction: id not found", trans_id)
+
+        trans['response'] = self.process(action, payload, trans)
+
+    def process(self, action, payload, trans):
+        if action == JOIN:
+            return self.process_join(payload, trans)
+        #elif action == ANNOUNCE:
+         #   return self.process_announce(payload, trans)
+        elif action == ERROR:
+            return self.process_error(payload, trans)
+
+    def process_join(self, payload, trans):
+        self.connection_id = struct.unpack('!Q', payload)[0]
+        return self.connection_id
+
