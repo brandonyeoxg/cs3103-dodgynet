@@ -5,6 +5,7 @@ import struct
 import time
 from UdpTrackerCommons import *
 from TrackerException import TrackerRequestException, TrackerResponseException
+import ipaddress
 
 """
     Tracker for working with udp based tracking protocol on the client side
@@ -57,9 +58,13 @@ class UdpTrackerClient:
 
     def announce(self):
         arguments = dict.fromkeys(self.announce_fields)
-        arguments['peer_id'] = self.peer_id
+        arguments['peer_id'] = self.peer_id.encode()
         arguments['port'] = DEFAULT_PORT
+        arguments['ip_address'] = int(ipaddress.ip_address(self.host))
         arguments['num_want'] = 10
+        for a in self.announce_fields:
+            if arguments[a] is None:
+                arguments[a] = 0
         values = [arguments[a] for a in self.announce_fields]
         payload = struct.pack('!20sQQQLLLH', *values)
         return self.send(ANNOUNCE, payload)
@@ -88,8 +93,10 @@ class UdpTrackerClient:
 
     def process(self, action, payload):
         if action == JOIN:
+            print("Client process join")
             return self.process_join(payload)
         elif action == ANNOUNCE:
+            print("Client process announce")
             return self.process_announce(payload)
         elif action == ERROR:
             return self.process_error(payload)

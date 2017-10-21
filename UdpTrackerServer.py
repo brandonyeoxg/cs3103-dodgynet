@@ -31,7 +31,7 @@ class UdpTrackerServer:
         self.conn_valid_interval = conn_valid_interval
 
     def run_server_tracker(self):
-        self.cull_connections()
+        #self.cull_connections()
         print("waiting for connections")
         print (self.listen_for_request())
 
@@ -39,28 +39,34 @@ class UdpTrackerServer:
         server_time = time.time()
         del_conns = []
         for connection in self.connections:
-            conn_time = connection['time']
-            delta_time = conn_time - server_time
+            print (connection)
+            conn_time = float(connection['time'])
+            delta_time = server_time - conn_time
+            print ("delta time:" + str(delta_time))
             if (delta_time > DEFAULT_TIMEOUT):
-                del_conns.append(connection['conn_id'])
-        for connection in self.connections:
-            del self.connections[connection['conn_id']]
+                del_conns.append(connection["conn_id"])
+        for connection in del_conns:
+            del self.connections[connection["conn_id"]]
 
 
     def listen_for_request(self):
         request, addr = self.sock.recvfrom(1024)
         request_header = request[:12]
         payload = request[12:]
-        conn_id = request_header[:8]
-        action = request_header[8:]
+        conn_id = struct.unpack('!Q', request_header[:8])[0]
+        action = struct.unpack('!L', request_header[8:])[0]
 
-        trans = {'action': action, 'time': time.time(), 'payload': payload, 'complete': False,
-                 'response': self.process_request(addr, action, conn_id, payload), 'completed': True}
+        trans = {'action': action, 'time': time.time(), 'payload': payload, 'complete': False}
+
+        trans['response'] = self.process_request(addr, conn_id, action, payload)
+        trans['completed'] = True
+
         return trans
 
     def send(self, addr, action, transaction_id, payload=None):
+        print("Server sends data")
         if not payload:
-            payload = ''
+            payload = b''
         trans = {
             'action': action,
             'time': time.time(),
@@ -80,27 +86,40 @@ class UdpTrackerServer:
 
     def process_request(self, addr, conn_id, action, payload):
         if action == JOIN:
+            print("Server handles join")
             return self.process_join(addr, action, payload)
         elif action == ANNOUNCE:
+            print("Server handles announce")
             return self.process_announce(addr, conn_id, action, payload)
 
     def process_join(self,addr, action, payload):
         conn_id = self.generate_connection_id()
-        transaction_id = payload
+        transaction_id = struct.unpack('!L',payload)[0]
         new_payload = struct.pack('!Q', conn_id)
-        self.connections[conn_id] = {'conn_id':conn_id,'time':time.time()}
+        self.connections.append({'conn_id':conn_id,'time':time.time()})
+        print (self.connections)
         return self.send(addr, action, transaction_id, new_payload)
 
     def process_announce(self, addr, conn_id, action, payload):
-        if conn_id in self.connections is True:
-            transaction_id, peer_id, download, left, uploaded, event, ip_addr, num_want, port = struct.unpack('!L20sQQQLLLH', payload)
-            if conn_id in self.peer_list is False:
-                self.peer_list[conn_id] = {'peer_id':peer_id,'ip_addr':ip_addr, 'port':port}
-            interval = self.refresh_interval
+        for connection in self.connections:
+            if connection['conn_id'] == conn_id:
+                transaction_id, peer_id, download, left, uploaded, event, ip_addr, num_want, port = struct.unpack('!L20sQQQLLLH', payload)
+                self.add_peer(peer_id, addr[0], addr[1])
+                interval = self.refresh_interval
+                peers = b''.join(
+                    (ip_address(p['ip_addr']).packed + p['port'].to_bytes(length=2, byteorder='big'))
+                    for p in self.peer_list)
 
-            peers = b''.join(
-                (ip_address(p['ip_addr']).packed + p['port'].to_bytes(length=2, byteorder='big'))
-                for p in self.peer_list)
+                new_payload = struct.pack('!Q', interval) + peers
+                return self.send(addr, action, transaction_id, new_payload)
+        return dict()
 
-            new_payload = struct.pack('!Q', interval) + peers
-            return self.send((ip_addr, port), action, transaction_id, new_payload)
+    def add_peer(self, peer_id, ip_addr, port):
+        if not self.peer_list:
+            self.peer_list.append({'peer_id':peer_id, 'ip_addr':ip_addr, 'port':port})
+        else:
+            for peer in self.peer_list:
+                if peer['peer_id'] == peer_id:
+                    return
+            self.peer_list.append({'peer_id': peer_id, 'ip_addr': ip_addr, 'port': port})
+        return
