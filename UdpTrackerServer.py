@@ -3,6 +3,8 @@ import struct
 import time
 from ipaddress import ip_address
 from UdpTrackerCommons import *
+import threading
+import socketserver
 
 """
     Tracker for working with udp based tracking protocol on the server side
@@ -12,6 +14,7 @@ from UdpTrackerCommons import *
     tracker = UDPTracker(<url/localhost of initial seeder>, <timeout=2>, <infohash>)
     tracker.connect()
 """
+
 class UdpTrackerServer:
     connection_id = 0
 
@@ -33,7 +36,7 @@ class UdpTrackerServer:
     def run_server_tracker(self):
         #self.cull_connections()
         print("waiting for connections")
-        print (self.listen_for_request())
+        print(self.listen_for_request())
 
     def cull_connections(self):
         server_time = time.time()
@@ -104,19 +107,20 @@ class UdpTrackerServer:
         for connection in self.connections:
             if connection['conn_id'] == conn_id:
                 transaction_id, peer_id, download, left, uploaded, event, ip_addr, num_want, port = struct.unpack('!L20sQQQLLLH', payload)
-                self.add_peer(peer_id, addr[0], addr[1])
+                self.add_peer(conn_id, addr[0], addr[1])
                 interval = self.refresh_interval
                 peers = b''.join(
                     (ip_address(p['ip_addr']).packed + p['port'].to_bytes(length=2, byteorder='big'))
                     for p in self.peer_list)
 
                 new_payload = struct.pack('!Q', interval) + peers
+                print("Current peerlist: " + str(self.peer_list.__len__()))
                 return self.send(addr, action, transaction_id, new_payload)
         return dict()
 
     def add_peer(self, peer_id, ip_addr, port):
         if not self.peer_list:
-            self.peer_list.append({'peer_id':peer_id, 'ip_addr':ip_addr, 'port':port})
+            self.peer_list.append({'peer_id': peer_id, 'ip_addr': ip_addr, 'port': port})
         else:
             for peer in self.peer_list:
                 if peer['peer_id'] == peer_id:
