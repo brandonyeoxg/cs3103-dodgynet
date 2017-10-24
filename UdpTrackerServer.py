@@ -22,12 +22,14 @@ class UdpTrackerServer:
                  host: str = 'localhost',
                  port: int = DEFAULT_PORT,
                  refresh_interval: int = 300,
-                 conn_valid_interval: int = DEFAULT_TIMEOUT):
+                 conn_valid_interval: int = DEFAULT_TIMEOUT,
+                 chunk_have = []):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         hostname = socket.gethostbyname(host)
         self.sock.bind((hostname, port))
         self.peer_id = socket.gethostbyname(socket.gethostname())
-        self.peer_list = []
+        self.peer_list = [{'peer_id': 0, 'ip_addr': hostname, 'port': port, 'chunk_have': chunk_have}]
+        self.peer_list_ctr = 1
         self.connections = []
         self.addr = (host, port)
         self.refresh_interval = refresh_interval
@@ -35,7 +37,6 @@ class UdpTrackerServer:
 
     def run_server_tracker(self):
         #self.cull_connections()
-        print("waiting for connections")
         print(self.listen_for_request())
 
     def cull_connections(self):
@@ -51,6 +52,10 @@ class UdpTrackerServer:
         for connection in del_conns:
             del self.connections[connection["conn_id"]]
 
+    def generatePeerId(self):
+        output = self.peer_list_ctr
+        self.peer_list_ctr += 1
+        return output
 
     def listen_for_request(self):
         request, addr = self.sock.recvfrom(1024)
@@ -67,7 +72,6 @@ class UdpTrackerServer:
         return trans
 
     def send(self, addr, action, transaction_id, payload=None):
-        print("Server sends data")
         if not payload:
             payload = b''
         trans = {
@@ -89,41 +93,62 @@ class UdpTrackerServer:
 
     def process_request(self, addr, conn_id, action, payload):
         if action == JOIN:
-            print("Server handles join")
+            print("=========== Server handles join ===========")
             return self.process_join(addr, action, payload)
         elif action == ANNOUNCE:
-            print("Server handles announce")
+            print("=========== Server handles announce ===========")
             return self.process_announce(addr, conn_id, action, payload)
 
     def process_join(self,addr, action, payload):
         conn_id = self.generate_connection_id()
         transaction_id = struct.unpack('!L',payload)[0]
+        peer_id = str(self.generatePeerId())
         new_payload = struct.pack('!Q', conn_id)
-        self.connections.append({'conn_id':conn_id,'time':time.time()})
-        print (self.connections)
-        return self.send(addr, action, transaction_id, new_payload)
+        peer_id_payload = struct.pack('20s', peer_id.encode())
+        self.connections.append({'conn_id': conn_id, 'time': time.time(), 'peer_id': peer_id})
+        return self.send(addr, action, transaction_id, new_payload + peer_id_payload)
 
     def process_announce(self, addr, conn_id, action, payload):
         for connection in self.connections:
             if connection['conn_id'] == conn_id:
-                transaction_id, peer_id, download, left, uploaded, event, ip_addr, num_want, port = struct.unpack('!L20sQQQLLLH', payload)
-                self.add_peer(conn_id, addr[0], addr[1])
+                transaction_id, peer_id, download, left, uploaded, event, ip_addr, num_want, port, chunk_want, chunk_have \
+                    = struct.unpack('!L20sQQQLLLHLL', payload)
+                peer_id = int.from_bytes(peer_id, byteorder='big')
+                self.add_peer(peer_id, addr[0], addr[1])
+                if chunk_have != NO_CHUNK:
+                    self.update_peer_chunk(peer_id, chunk_have)
                 interval = self.refresh_interval
-                peers = b''.join(
-                    (ip_address(p['ip_addr']).packed + p['port'].to_bytes(length=2, byteorder='big'))
-                    for p in self.peer_list)
-
-                new_payload = struct.pack('!Q', interval) + peers
-                print("Current peerlist: " + str(self.peer_list.__len__()))
+                peers = b''
+                if chunk_want != NO_CHUNK:
+                    peers_with_chunk = self.getPeersByChunkNum(chunk_want)
+                    peers = b''.join(
+                        (ip_address(p['ip_addr']).packed + p['port'].to_bytes(length=2, byteorder='big'))
+                        for p in peers_with_chunk)
+                new_payload = struct.pack('!L', interval) + peers
+                print("=========== Current peerlist: " + str(self.peer_list.__len__()) + " ===========")
                 return self.send(addr, action, transaction_id, new_payload)
         return dict()
 
     def add_peer(self, peer_id, ip_addr, port):
         if not self.peer_list:
-            self.peer_list.append({'peer_id': peer_id, 'ip_addr': ip_addr, 'port': port})
+            self.peer_list.append({'peer_id': peer_id, 'ip_addr': ip_addr, 'port': port, 'chunk_have': []})
         else:
             for peer in self.peer_list:
                 if peer['peer_id'] == peer_id:
                     return
-            self.peer_list.append({'peer_id': peer_id, 'ip_addr': ip_addr, 'port': port})
+            self.peer_list.append({'peer_id': peer_id, 'ip_addr': ip_addr, 'port': port, 'chunk_have': []})
         return
+
+    def update_peer_chunk(self, peer_id, chunk_have):
+        for peer in self.peer_list:
+            if peer['peer_id'] == peer_id:
+                peer['chunk_have'].append(chunk_have)
+                print("========= Peer " + str(peer['peer_id']) + " Chunks =========")
+                print(peer['chunk_have'])
+
+    def getPeersByChunkNum(self, chunk_want):
+        peer_with_chunk = []
+        for peer in self.peer_list:
+            if chunk_want in peer['chunk_have']:
+                peer_with_chunk.append({'ip_addr': peer['ip_addr'], 'port': peer['port']})
+        return peer_with_chunk

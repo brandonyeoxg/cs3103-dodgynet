@@ -24,14 +24,16 @@ class UdpTrackerClient:
         "event",
         "ip_address",
         "num_want",
-        "port"
+        "port",
+        "chunk_want",
+        "chunk_have"
     ]
 
     def __init__(self, host = 'localhost', port = DEFAULT_PORT):
         self.host = host
         self.port = port
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.peer_id = self.host
+        self.peer_id = -1
         self.connection_id = DEFAULT_CONNECTION_ID
         self.transactions = {}
         self.timeout = DEFAULT_TIMEOUT
@@ -56,17 +58,19 @@ class UdpTrackerClient:
     def join(self):
         return self.send(JOIN)
 
-    def announce(self):
+    def announce(self, want_chunk_num = NO_CHUNK, have_chunk_num = NO_CHUNK):
         arguments = dict.fromkeys(self.announce_fields)
-        arguments['peer_id'] = self.peer_id.encode()
+        arguments['peer_id'] = bytes(self.peer_id, 'utf-8')
         arguments['port'] = DEFAULT_PORT
         arguments['ip_address'] = int(ipaddress.ip_address(self.host))
-        arguments['num_want'] = 10
+        arguments['num_want'] = DEFAULT_PEERS_WANT
+        arguments['chunk_want'] = want_chunk_num
+        arguments['chunk_have'] = have_chunk_num
         for a in self.announce_fields:
             if arguments[a] is None:
                 arguments[a] = 0
         values = [arguments[a] for a in self.announce_fields]
-        payload = struct.pack('!20sQQQLLLH', *values)
+        payload = struct.pack('!20sQQQLLLHLL', *values)
         return self.send(ANNOUNCE, payload)
 
     def listen_for_response(self):
@@ -93,23 +97,24 @@ class UdpTrackerClient:
 
     def process(self, action, payload):
         if action == JOIN:
-            print("Client process join")
+            print("=========== Client process join ===========")
             return self.process_join(payload)
         elif action == ANNOUNCE:
-            print("Client process announce")
+            print("=========== Client process announce ===========")
             return self.process_announce(payload)
         elif action == ERROR:
             return self.process_error(payload)
 
     def process_join(self, payload):
-        self.connection_id = struct.unpack('!Q', payload)[0]
-        return self.connection_id
+        self.connection_id, self.peer_id = struct.unpack('!Q20s', payload)
+        self.peer_id = self.peer_id.decode('ascii').rstrip('\x00')
+        return dict(conn_id=self.connection_id, peer_id=self.peer_id)
 
     def process_announce(self, payload):
         info_struct = '!L'
         info_size = struct.calcsize(info_struct)
         info = payload[:info_size]
-        interval = struct.unpack(info_struct, info)
+        interval = struct.unpack(info_struct, info)[0]
 
         peer_data = payload[info_size:]
         peer_struct = '!LH'
