@@ -15,3 +15,6 @@ try:
 
 except KeyboardInterrupt:
     looping = False
+
+finally:
+    server.shutdown()

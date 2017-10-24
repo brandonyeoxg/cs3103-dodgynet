@@ -63,12 +63,9 @@ class UdpTrackerServer:
         payload = request[12:]
         conn_id = struct.unpack('!Q', request_header[:8])[0]
         action = struct.unpack('!L', request_header[8:])[0]
-
         trans = {'action': action, 'time': time.time(), 'payload': payload, 'complete': False}
-
         trans['response'] = self.process_request(addr, conn_id, action, payload)
         trans['completed'] = True
-
         return trans
 
     def send(self, addr, action, transaction_id, payload=None):
@@ -98,8 +95,11 @@ class UdpTrackerServer:
         elif action == ANNOUNCE:
             print("=========== Server handles announce ===========")
             return self.process_announce(addr, conn_id, action, payload)
+        elif action == QUIT:
+            print("=========== Server handles quit ===========")
+            return self.process_quit(addr, conn_id, action, payload)
 
-    def process_join(self,addr, action, payload):
+    def process_join(self, addr, action, payload):
         conn_id = self.generate_connection_id()
         transaction_id = struct.unpack('!L',payload)[0]
         peer_id = str(self.generatePeerId())
@@ -113,14 +113,14 @@ class UdpTrackerServer:
             if connection['conn_id'] == conn_id:
                 transaction_id, peer_id, download, left, uploaded, event, ip_addr, num_want, port, chunk_want, chunk_have \
                     = struct.unpack('!L20sQQQLLLHLL', payload)
-                peer_id = int.from_bytes(peer_id, byteorder='big')
+                peer_id = peer_id.decode(encoding="UTF-8").rstrip('\x00')
                 self.add_peer(peer_id, addr[0], addr[1])
                 if chunk_have != NO_CHUNK:
                     self.update_peer_chunk(peer_id, chunk_have)
                 interval = self.refresh_interval
                 peers = b''
                 if chunk_want != NO_CHUNK:
-                    peers_with_chunk = self.getPeersByChunkNum(chunk_want)
+                    peers_with_chunk = self.get_peers_by_chunk_num(chunk_want)
                     peers = b''.join(
                         (ip_address(p['ip_addr']).packed + p['port'].to_bytes(length=2, byteorder='big'))
                         for p in peers_with_chunk)
@@ -128,6 +128,27 @@ class UdpTrackerServer:
                 print("=========== Current peerlist: " + str(self.peer_list.__len__()) + " ===========")
                 return self.send(addr, action, transaction_id, new_payload)
         return dict()
+
+    def process_quit(self, addr, conn_id, action, payload):
+        a = 0
+        for conn in self.connections:
+            if conn_id == conn['conn_id']:
+                peer_id = conn['peer_id']
+                self.delete_peer_from_list(peer_id)
+                break
+            a += 1
+        del self.connections[a]
+        transaction_id = struct.unpack('!L', payload)[0]
+        return self.send(addr, action, transaction_id)
+
+    def delete_peer_from_list(self, peer_id):
+        a = 0
+        for peer in self.peer_list:
+            if peer['peer_id'] == peer_id:
+                del peer
+                break
+            a += 1
+        del self.peer_list[a]
 
     def add_peer(self, peer_id, ip_addr, port):
         if not self.peer_list:
@@ -146,9 +167,12 @@ class UdpTrackerServer:
                 print("========= Peer " + str(peer['peer_id']) + " Chunks =========")
                 print(peer['chunk_have'])
 
-    def getPeersByChunkNum(self, chunk_want):
+    def get_peers_by_chunk_num(self, chunk_want):
         peer_with_chunk = []
         for peer in self.peer_list:
             if chunk_want in peer['chunk_have']:
                 peer_with_chunk.append({'ip_addr': peer['ip_addr'], 'port': peer['port']})
         return peer_with_chunk
+
+    def shutdown(self):
+        self.sock.shutdown()

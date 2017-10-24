@@ -79,17 +79,13 @@ class UdpTrackerClient:
             response = self.sock.recv(1024)
         except socket.timeout:
             return dict()
-
         headers = response[:8]
         payload = response[8:]
-
         action, trans_id = struct.unpack("!LL", headers)
-
         try:
             trans = self.transactions[trans_id]
         except KeyError:
             raise TrackerResponseException("Invalid Transaction: id not found", trans_id)
-
         trans['response'] = self.process(action, payload)
         trans['completed'] = True
         del self.transactions[trans_id]
@@ -102,8 +98,9 @@ class UdpTrackerClient:
         elif action == ANNOUNCE:
             print("=========== Client process announce ===========")
             return self.process_announce(payload)
-        elif action == ERROR:
-            return self.process_error(payload)
+        elif action == QUIT:
+            print("=========== Client process quit ===========")
+            return self.process_quit(payload)
 
     def process_join(self, payload):
         self.connection_id, self.peer_id = struct.unpack('!Q20s', payload)
@@ -115,13 +112,11 @@ class UdpTrackerClient:
         info_size = struct.calcsize(info_struct)
         info = payload[:info_size]
         interval = struct.unpack(info_struct, info)[0]
-
         peer_data = payload[info_size:]
         peer_struct = '!LH'
         peer_size = struct.calcsize(peer_struct)
         peer_count = len(peer_data) / peer_size
         peers = []
-
         for peer_offset in range(int(peer_count)):
             off = peer_size * peer_offset
             peer = peer_data[off:off + peer_size]
@@ -130,10 +125,13 @@ class UdpTrackerClient:
                 'addr': socket.inet_ntoa(struct.pack('!L', addr)),
                 'port': port
             })
-
         return dict(interval=interval,
                     peers=peers)
 
-    def process_error(self, payload):
-        message = struct.unpack('!8s', payload)
-        raise TrackerResponseException('Error response', message)
+    def process_quit(self, payload):
+        return dict(quit="True")
+
+    def shutdown(self):
+        #send shutdown to server
+        self.send(QUIT)
+        return self.listen_for_response()

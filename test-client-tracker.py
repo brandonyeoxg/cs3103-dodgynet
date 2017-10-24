@@ -15,3 +15,5 @@ for chunk_num in fake_total_chunks:
     chunk_have = chunk_num
     time.sleep(interval)
 client.announce(NO_CHUNK, chunk_have)
+client.listen_for_response()
+print(client.shutdown())

@@ -9,7 +9,7 @@ DEFAULT_PEERS_WANT = 10
 NO_CHUNK = 4294967295
 JOIN = 0
 ANNOUNCE = 1
-ERROR = 2
+QUIT = 2
 
 
 def parseurl(url):
