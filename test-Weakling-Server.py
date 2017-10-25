@@ -15,12 +15,14 @@ def main():
         ep.start()
         def handler(signal, frame):
             ep.shutdown()
+            exit()
         signal.signal(signal.SIGINT, handler)
+        ep.get_input()
     except (KeyboardInterrupt, SystemExit):
         print("Caught, Shutting down from main")
-        if ep != None:
-           ep.shutdown()
+        ep.shutdown()
         exit()
+    print("Exit!!")
 
 if __name__ == "__main__":
     main()
