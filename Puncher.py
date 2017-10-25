@@ -192,7 +192,7 @@ class DirectoryClient(object):
         pass
     def list(self):
         return [("Hello.txt", 50121), ("Hello1.txt", 50122)]
-    def new_file(self):
+    def new_file(self, file_name, chunk_list):
         return True
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=80:
