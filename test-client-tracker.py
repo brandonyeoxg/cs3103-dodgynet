@@ -12,6 +12,7 @@ for chunk_num in fake_total_chunks:
     response = client.listen_for_response()
     print(response)
     interval = response['response']['interval']
+    peers = response['response']['peers']
     chunk_have = chunk_num
     time.sleep(interval)
 client.announce(NO_CHUNK, chunk_have)
