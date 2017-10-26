@@ -5,6 +5,7 @@ object is initialized. We will assume that all strings are validated.
 import Config
 import socket
 import struct
+from collections import defaultdict
 
 class PuncherProtocol(object):
     payload_len = 56
@@ -45,27 +46,25 @@ class PuncherServer(object):
         print("[Puncher] Listening on UDP[%d]" % self.addr[1])
 
         # Now we keep serving clients
-        client_lookup = {}
+        client_lookup = defaultdict(dict)
         while True:
             data, c_pub_addr = sockfd.recvfrom(PuncherProtocol.payload_len)
             data_addr, msg = PuncherProtocol.unpack(data)
-            print("[Puncher] Connection from %s:%d" % c_pub_addr)
-            print((data_addr, msg))
+            print("[Puncher] Recieve Data[%s] from %s" % (str((data_addr, msg)), str(c_pub_addr)))
             
             if msg == 'H':
                 c_prv_addr = data_addr
-                print("ACK pub_addr")
-                print((c_pub_addr, 'A'))
-                print("Detected Private IP %s" % str(c_prv_addr))
-                client_lookup[c_pub_addr[0]] = c_pub_addr
-                sockfd.sendto(PuncherProtocol.pack(c_pub_addr, 'A'), c_pub_addr)
+                data = (c_pub_addr, 'A')
+                print("[Puncher] Send ACK pub_addr[%s] to [%s]" % (str(data), str(c_pub_addr)))
+                client_lookup[c_pub_addr[0]][c_pub_addr[0]] = c_pub_addr
+                sockfd.sendto(PuncherProtocol.pack(*data), c_pub_addr)
             elif msg == "C":
                 target_addr = data_addr
-                print("CONN node_addr")
-                print(client_lookup)
-                target_addr = client_lookup[target_addr[0]]
-                print((target_addr, 'A'))
-                sockfd.sendto(PuncherProtocol.pack(target_addr, 'A'), c_pub_addr)
+                if target_addr[1]==0:
+                    target_addr = next (iter (client_lookup[target_addr[0]].values()) )
+                data = (target_addr, 'A')
+                print("[Puncher] Send CONN target_addr[%s] to [%s]" % (str(data), str(c_pub_addr)))
+                sockfd.sendto(PuncherProtocol.pack(*data), c_pub_addr)
             '''
             data, addr = sockfd.recvfrom(PuncherProtocol.payload_len)
             if data != "ok".encode('utf-8'):
@@ -97,6 +96,8 @@ class WeaklingProtocol(object):
     def start(self):
         self.server.start()
         self.client.start()
+    def get_identity(self):
+        return self.server.get_identity()
 
 import sys
 class WeaklingServer(object):
@@ -106,28 +107,27 @@ class WeaklingServer(object):
         self.sockfd = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
         self.t = threading.Thread(target=self.thread_job)
         self.t.daemon = True
+        self.id = "Dodgy"
     def thread_job(self):
         while True:
-            print("[WeaklingServer] Listening...")
             data, addr = self.sockfd.recvfrom(1024)
-            print((data, addr))
+            print("[Weakling-S] Recieve Data from %s" % str(addr))
             self.queue.put((data, addr))
     def start(self):
         my_addr = socket.gethostbyname(socket.gethostname()),0
-        print("HELLO my_addr")
-        print(my_addr)
-
+        print("[Weakling-S] Send HELLO my_addr[%s] to %s" % (str(my_addr), str(self.apuncher_addr)))
         self.sockfd.sendto(PuncherProtocol.pack(my_addr, 'H'), self.apuncher_addr)
         data, addr = self.sockfd.recvfrom(PuncherProtocol.payload_len)
         my_addr, msg = PuncherProtocol.unpack(data)
-        print("ACK my_addr")
-        print(my_addr)
+        print("[Weakling-S] Recieve Data[%s] from %s" % (str((my_addr, msg)), str(addr)))
 
         if msg != 'A':
             print("Server Message fatal error.")
             sys.exit(1)
-
+        self.id = "%s:%d" % my_addr
         self.t.start()
+    def get_identity(self):
+        return self.id
     def shutdown(self):
         #self.t.terminate()
         #self.t.join()
@@ -148,7 +148,7 @@ class WeaklingClient(object):
             self.addr = addr
             self.sock = sock
         def send(self, data):
-            self.sock.sendto(data, self.addr)
+            print("[Weakling-C] Send Data[%s] to %s" % (str(data), str(self.addr)))
             self.sock.sendto(data, self.addr)
     def __init__(self, queue, apuncher_addr):
         self.queue = queue
@@ -168,12 +168,11 @@ class WeaklingClient(object):
             self.sockfd.sendto( item.encode('utf-8'), self.target )
     def connect(self, node_id, node_port=0):
         node_addr = (node_id, node_port)
+        print("[Weakling-C] Send CONN my_addr[%s] to %s" % (str(node_addr), str(self.apuncher_addr)))
         self.sockfd.sendto(PuncherProtocol.pack(node_addr, 'C'), self.apuncher_addr)
         data, addr = self.sockfd.recvfrom(PuncherProtocol.payload_len)
         node_addr, msg = PuncherProtocol.unpack(data)
-        print("ACK node_addr")
-        print(node_addr)
-        print("Connect to node")
+        print("[Weakling-C] Recieve Data[%s] from %s" % (str((node_addr, msg)), str(addr)))
         return WeaklingClient.Connection(node_addr, self.sockfd)
     def start(self):
         self.t.start()
@@ -191,14 +190,14 @@ class DummyEndpoint(object):
         while True:
             item = self.p_queue.get()
             if item == None:
-                print("Quit Dummy Endpoint")
+                print("[Client] Endpoint Terminate")
                 break
             data, addr = item
             data = data.decode('utf-8')
-            print("Recieved [%s]" % data)
+            print("[Client] Data Unpacked: %s" % data)
             if data == "Send me chunk 1.":
-                print("\nSending back")
-                conn = self.weaklingP.client.connect(*addr)
+                print("[Client] Send Data[Here is chunk 1.]")
+                conn = self.weaklingP.client.connect(addr[0])
                 conn.send("Here is chunk 1.".encode('utf-8'))
     def start(self):
         self.t.start()
@@ -210,13 +209,13 @@ class DummyEndpoint(object):
         #self.t.join(1)
     def get_input(self):
         while True:
-            print('Dodgy>', end='', flush=True)
+            print(self.weaklingP.get_identity() + '>', end='', flush=True)
             data = sys.stdin.readline()
             if data == 'Q':
                 break
-            addr_raw = data.split(',')
+            addr_raw = data.split(':')
             addr = (addr_raw[0], int(addr_raw[1]))
-            print("Connecting to %s" % str(addr))
+            print("[Client] Request chunk 1.")
             conn = self.weaklingP.client.connect(*addr)
             conn.send("Send me chunk 1.".encode('utf-8'))
 #            conn.send("HELLO WORLD".encode('utf-8'))
