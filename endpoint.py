@@ -123,16 +123,16 @@ class DummyEndpoint(object):
             for chunk_num in chunks_needed:
 
                 print ('Chunk wanted: ' + str(chunk_num))
-                #client.announce(NO_CHUNK, chunk_have)
-                #response = client.listen_for_response()
+                clientObj.announce(NO_CHUNK, chunk_have)
+                response = clientObj.listen_for_response()
                 print(response)
 
                 if len(response) > 0:
                     #interval = response['response']['interval']
                     peer_list = response['response']['peers']
 
-                    #addr = peer_list[0]['addr'] 
-                    addr = "127.0.0.1"
+                    addr = peer_list[0]['addr'] 
+                    #addr = "127.0.0.1"
 
                     request = P2pProtocol.leechPack(fileName, chunk_num)
 
