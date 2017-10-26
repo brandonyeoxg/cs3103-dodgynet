@@ -122,7 +122,7 @@ class WeaklingServer(object):
         print("[Weakling-S] Recieve Data[%s] from %s" % (str((my_addr, msg)), str(addr)))
 
         if msg != 'A':
-            print("Server Message fatal error.")
+            print("[Weakling-S] Server Message fatal error.")
             sys.exit(1)
         self.id = "%s:%d" % my_addr
         self.t.start()
@@ -131,7 +131,7 @@ class WeaklingServer(object):
     def shutdown(self):
         #self.t.terminate()
         #self.t.join()
-        print("Socket Shutdown")
+        print("[Weakling-S] Socket Shutdown")
         #my_addr = socket.gethostbyname(socket.gethostname()),0
         #self.sockfd.sendto(None, my_addr)
         self.sockfd.close()
@@ -163,7 +163,7 @@ class WeaklingClient(object):
         while True:
             item = self.queue.get()
             if item == None:
-                print("Quit WeaklingClient")
+                print("[Weakling-C] Stop Queue")
                 break
             self.sockfd.sendto( item.encode('utf-8'), self.target )
     def connect(self, node_id, node_port=0):
@@ -203,7 +203,7 @@ class DummyEndpoint(object):
         self.t.start()
         self.weaklingP.start()
     def shutdown(self):
-        print("Put None")
+        print("[Client] Terminate Queue by put in None")
         self.p_queue.put(None)
         self.weaklingP.shutdown()
         #self.t.join(1)
