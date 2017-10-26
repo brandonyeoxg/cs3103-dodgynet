@@ -97,6 +97,7 @@ class DummyEndpoint(object):
                 file.close()
 
                 chunks_needed.remove(picked['chunkNum'])
+                #clientObj.announce(NO_CHUNK, chunkNum)
 
             '''
             if data == "Send me chunk 1.":
