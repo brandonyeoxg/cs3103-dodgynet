@@ -4,6 +4,7 @@ import pickle
 from UdpTrackerServer import *
 from UdpTrackerClient import *
 from enum import Enum
+import Puncher
 
 CHUNK_SIZE = 1024
 
@@ -54,10 +55,10 @@ class P2pProtocol(object):
 
 
 class DummyEndpoint(object):
-    def __init__(self, apuncher_addr, fileName, clientObj=None, chunks_needed=None):
+    def __init__(self, apuncher_addr, fileName, chunks_needed, clientObj=None):
         self.p_queue = queue.Queue()
         self.c_queue = queue.Queue()
-        self.weaklingP = WeaklingProtocol(apuncher_addr, self.p_queue, self.c_queue)
+        self.weaklingP = Puncher.WeaklingProtocol(apuncher_addr, self.p_queue, self.c_queue)
         self.t = threading.Thread(target=self.thread_job)
         self.t.daemon = True
         self.fileName = fileName
@@ -122,15 +123,16 @@ class DummyEndpoint(object):
             for chunk_num in chunks_needed:
 
                 print ('Chunk wanted: ' + str(chunk_num))
-                client.announce(NO_CHUNK, chunk_have)
-                response = client.listen_for_response()
+                #client.announce(NO_CHUNK, chunk_have)
+                #response = client.listen_for_response()
                 print(response)
 
                 if len(response) > 0:
                     #interval = response['response']['interval']
                     peer_list = response['response']['peers']
 
-                    addr = peer_list[0]['addr'] 
+                    #addr = peer_list[0]['addr'] 
+                    addr = "127.0.0.1"
 
                     request = P2pProtocol.leechPack(fileName, chunk_num)
 

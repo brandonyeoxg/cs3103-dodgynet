@@ -43,7 +43,8 @@ def main():
         #get server inside
         #do wait loop until user terminates
         #tTODO
-        ep = endpoint.DummyEndpoint("127.0.0.1", fileName) #TODO change to puncher addr
+        c = []
+        ep = endpoint.DummyEndpoint("127.0.0.1", fileName, []) #TODO change to puncher addr
         ep.start()
 
     elif (clientType == "leech" and option == "list"):
@@ -73,7 +74,7 @@ def main():
         for c in total_chunks:
             total_chunks_remaining.append(c)
 
-        ep = endpoint.DummyEndpoint("127.0.0.1", fileName, client, total_chunks_remaining) #TODO change to puncher addr
+        ep = endpoint.DummyEndpoint("127.0.0.1", fileName, total_chunks_remaining, client) #TODO change to puncher addr
         ep.start()
         ep.get_input()
 
