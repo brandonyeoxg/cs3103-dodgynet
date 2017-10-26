@@ -2,7 +2,9 @@ from UdpTrackerClient import *
 
 client = UdpTrackerClient("127.0.0.1", DEFAULT_PORT)
 client.join()
-print (client.listen_for_response())
+response = client.listen_for_response()
+chunk_list = response['response']['chunk_list']
+print (chunk_list)
 
 fake_total_chunks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 chunk_have = NO_CHUNK

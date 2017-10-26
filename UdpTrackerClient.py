@@ -103,9 +103,23 @@ class UdpTrackerClient:
             return self.process_quit(payload)
 
     def process_join(self, payload):
-        self.connection_id, self.peer_id = struct.unpack('!Q20s', payload)
+        fixed_payload = payload[:28]
+        chunk_data = payload[28:]
+
+        chunk_size = struct.calcsize('!L')
+        chunk_count = len(chunk_data) / chunk_size
+
+        recv_chunk_list = []
+
+        for chunk_offset in range(int(chunk_count)):
+            off = chunk_size * chunk_offset
+            chunk = chunk_data[off: off + chunk_size]
+            chunk_num = struct.unpack('!L', chunk)[0]
+            recv_chunk_list.append(chunk_num)
+
+        self.connection_id, self.peer_id = struct.unpack('!Q20s', fixed_payload)
         self.peer_id = self.peer_id.decode('ascii').rstrip('\x00')
-        return dict(conn_id=self.connection_id, peer_id=self.peer_id)
+        return dict(conn_id=self.connection_id, peer_id=self.peer_id, chunk_list=recv_chunk_list)
 
     def process_announce(self, payload):
         info_struct = '!L'

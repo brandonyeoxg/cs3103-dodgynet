@@ -4,7 +4,6 @@ import time
 from ipaddress import ip_address
 from UdpTrackerCommons import *
 import threading
-import socketserver
 
 """
     Tracker for working with udp based tracking protocol on the server side
@@ -25,10 +24,12 @@ class UdpTrackerServer:
                  conn_valid_interval: int = DEFAULT_TIMEOUT,
                  chunk_have = []):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        hostname = socket.gethostbyname(host)
+        self.host = host
+        hostname = self.get_public_ip()
         self.sock.bind((hostname, port))
         self.peer_id = socket.gethostbyname(socket.gethostname())
         self.peer_list = [{'peer_id': 0, 'ip_addr': hostname, 'port': port, 'chunk_have': chunk_have}]
+        self.chunk_list = chunk_have
         self.peer_list_ctr = 1
         self.connections = []
         self.addr = (host, port)
@@ -38,6 +39,9 @@ class UdpTrackerServer:
     def run_server_tracker(self):
         #self.cull_connections()
         print(self.listen_for_request())
+
+    def get_public_ip(self):
+        return socket.gethostbyname(self.host)
 
     def cull_connections(self):
         server_time = time.time()
@@ -106,7 +110,10 @@ class UdpTrackerServer:
         new_payload = struct.pack('!Q', conn_id)
         peer_id_payload = struct.pack('20s', peer_id.encode())
         self.connections.append({'conn_id': conn_id, 'time': time.time(), 'peer_id': peer_id})
-        return self.send(addr, action, transaction_id, new_payload + peer_id_payload)
+        packed_chunks = b''
+        for chunk in self.chunk_list:
+            packed_chunks = packed_chunks + struct.pack('!L', chunk)
+        return self.send(addr, action, transaction_id, new_payload + peer_id_payload + packed_chunks)
 
     def process_announce(self, addr, conn_id, action, payload):
         for connection in self.connections:
