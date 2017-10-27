@@ -7,7 +7,7 @@ print("Started listening on %s" % str(DEFAULT_PORT))
 try:
     fake_total_chunks = [0]
     # <localhost> == seeders public ip 
-    server = UdpTrackerServer('localhost',
+    server = UdpTrackerServer('',
                               DEFAULT_PORT,
                               1, DEFAULT_TIMEOUT,
                               fake_total_chunks)
