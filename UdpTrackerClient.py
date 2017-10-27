@@ -75,7 +75,7 @@ class UdpTrackerClient:
         return self.send(ANNOUNCE, payload)
 
     def listen_for_response(self):
-        self.sock.settimeout(self.timeout)
+        #self.sock.settimeout(self.timeout)
         try:
             response = self.sock.recv(1024)
         except socket.timeout:
