@@ -114,7 +114,7 @@ class WeaklingServer(object):
             print("[Weakling-S] Recieve Data from %s" % str(addr))
             self.queue.put((data, addr))
     def start(self):
-        my_addr = socket.gethostbyname(socket.gethostname()),0
+        my_addr = (socket.gethostbyname(socket.gethostname()),0)
         print("[Weakling-S] Send HELLO my_addr[%s] to %s" % (str(my_addr), str(self.apuncher_addr)))
         self.sockfd.sendto(PuncherProtocol.pack(my_addr, 'H'), self.apuncher_addr)
         data, addr = self.sockfd.recvfrom(PuncherProtocol.payload_len)

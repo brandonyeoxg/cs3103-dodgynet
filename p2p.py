@@ -9,7 +9,8 @@ import Puncher
 import endpoint
 
 CHUNK_SIZE = 1024
-DEFAULT_PORT = 50818
+#DEFAULT_PORT = 50818
+DEFAULT_PUNCHER_A = ("127.0.0.1", 50818)
 
 def main():
 
@@ -29,7 +30,7 @@ def main():
         if (option == "upload"):
             dirClient = Puncher.DirectoryClient()
             dirClient.new_file(fileName, total_chunks)
-
+        
         # become seeder
         client = UdpTrackerClient("127.0.0.1", DEFAULT_PORT) #TODO change to file dir IP
         client.join()
@@ -44,8 +45,15 @@ def main():
         #do wait loop until user terminates
         #tTODO
         c = []
-        ep = endpoint.DummyEndpoint("127.0.0.1", fileName, []) #TODO change to puncher addr
+        ep = endpoint.DummyEndpoint(DEFAULT_PUNCHER_A, fileName, []) #TODO change to puncher addr
         ep.start()
+
+        # Wait until User terminates
+        u_input = None
+        while u_input!='Quit':
+                u_input = input("Type Quit to stop seeding and quit the program:")
+
+        print("Quitting!")
 
     elif (clientType == "leech" and option == "list"):
         # call dir client list, display results and quit
@@ -74,7 +82,7 @@ def main():
         for c in total_chunks:
             total_chunks_remaining.append(c)
 
-        ep = endpoint.DummyEndpoint("127.0.0.1", fileName, total_chunks_remaining, client) #TODO change to puncher addr
+        ep = endpoint.DummyEndpoint(DEFAULT_PUNCHER_A, fileName, total_chunks_remaining, client) #TODO change to puncher addr
         ep.start()
         ep.get_input()
 
