@@ -36,7 +36,7 @@ class UdpTrackerClient:
         self.peer_id = -1
         self.connection_id = DEFAULT_CONNECTION_ID
         self.transactions = {}
-        self.timeout = DEFAULT_TIMEOUT
+        self.timeout = 10000
 
     def send(self, action, payload=None):
         if not payload:
@@ -48,6 +48,7 @@ class UdpTrackerClient:
             'payload': payload,
             'complete': False
         }
+        print((self.host, self.port))
         self.sock.sendto(header + payload, (self.host, self.port))
         return trans
 

@@ -13,12 +13,13 @@ import threading
     tracker = UDPTracker(<url/localhost of initial seeder>, <timeout=2>, <infohash>)
     tracker.connect()
 """
+DEFAULT_TIMEOUT = 1000
 
 class UdpTrackerServer:
     connection_id = 0
 
     def __init__(self,
-                 host: str = 'localhost',
+                 host: str = '',
                  port: int = DEFAULT_PORT,
                  refresh_interval: int = 300,
                  conn_valid_interval: int = DEFAULT_TIMEOUT,
