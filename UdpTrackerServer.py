@@ -31,6 +31,7 @@ class UdpTrackerServer:
         self.sock.bind(('', port))
         self.peer_id = socket.gethostbyname(socket.gethostname())
         self.peer_list = [{'peer_id': 0, 'ip_addr': hostname, 'port': port, 'chunk_have': chunk_have}]
+        self.peer_list = []
         self.chunk_list = chunk_have
         self.peer_list_ctr = 1
         self.connections = []
