@@ -9,7 +9,7 @@ try:
     # <localhost> == seeders public ip 
     server = UdpTrackerServer('',
                               DEFAULT_PORT,
-                              1, DEFAULT_TIMEOUT,
+                              9999, DEFAULT_TIMEOUT,
                               fake_total_chunks)
     while looping:
         print ('server listening')

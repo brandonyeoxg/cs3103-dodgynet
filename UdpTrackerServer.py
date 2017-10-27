@@ -65,6 +65,7 @@ class UdpTrackerServer:
 
     def listen_for_request(self):
         request, addr = self.sock.recvfrom(1024)
+        print("Request from %s " % str((request, addr)))
         request_header = request[:12]
         payload = request[12:]
         conn_id = struct.unpack('!Q', request_header[:8])[0]
