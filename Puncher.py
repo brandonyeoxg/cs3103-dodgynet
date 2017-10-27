@@ -182,6 +182,7 @@ class WeaklingClient(object):
             #self.my_addr
             data = WeaklingProtocol.pack(self.my_addr, app_data)
             self.sock.sendto(data, self.addr)
+            self.sock.sendto(data, self.addr)
     def __init__(self, queue, apuncher_addr):
         self.queue = queue
         self.apuncher_addr = apuncher_addr
