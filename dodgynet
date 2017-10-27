@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import sys
 import os
 import math
@@ -12,7 +13,18 @@ CHUNK_SIZE = 1024
 #DEFAULT_PORT = 50818
 DEFAULT_PUNCHER_A = ("127.0.0.1", 50818)
 
+def help():
+    print ("Usage:")
+    print ("p2pclient seed upload/join <filename>")
+    print ("p2pclient leech list")
+    #print ("p2pclient leech query <filename>")
+    print ("p2pclient leech download <filename>")
+
 def main():
+    
+    if len(sys.argv) < 3:
+        help()
+        return
 
     clientType = sys.argv[1]
     option = sys.argv[2]
@@ -20,16 +32,15 @@ def main():
     if (clientType == "seed"):
 
         fileName = sys.argv[3]
-        filesize = os.path.getsize(fileName)
-        numChunks = math.ceil(filesize/CHUNK_SIZE)
-
-        total_chunks = []
-        for count in range(numChunks):
-            total_chunks.append(count)
+        #TODO change to puncher addr
+        ep = endpoint.DummyEndpoint(DEFAULT_PUNCHER_A)
+        ep.file_to_mem(fileName)
+        print("[Seeder] File Chunk Indices = %s" % str(ep.total_chunks))
+        print("[Seeder] File byte size = %d" % ep.file_size)
 
         if (option == "upload"):
             dirClient = Puncher.DirectoryClient()
-            dirClient.new_file(fileName, total_chunks)
+            dirClient.new_file(fileName, ep.total_chunks)
         
         # become seeder
         client = UdpTrackerClient("127.0.0.1", DEFAULT_PORT) #TODO change to file dir IP
@@ -37,7 +48,7 @@ def main():
         print (client.listen_for_response())
 
         chunk_have = NO_CHUNK
-        for c in total_chunks:
+        for c in ep.total_chunks:
             client.announce(NO_CHUNK, c)
         
         #init weakling protocol
@@ -45,7 +56,6 @@ def main():
         #do wait loop until user terminates
         #tTODO
         c = []
-        ep = endpoint.DummyEndpoint(DEFAULT_PUNCHER_A, fileName, []) #TODO change to puncher addr
         ep.start()
 
         # Wait until User terminates
@@ -65,24 +75,18 @@ def main():
 
 
     elif (clientType == "leech" and option == "download"):
-        #fileName = sys.argv[3]
-        portNum = sys.argv[3]
+        fileName = sys.argv[3]
+        portNum = 9876 #int(sys.argv[3])
 
         client = UdpTrackerClient("127.0.0.1", portNum) #TODO change to file directory ip
         client.join()
         #print (client.listen_for_response())
         resp = client.listen_for_response()
-        print ('Connection: '+ resp['response']['completed'])
+        #print ('Connection: '+ resp['response']['completed'])
         total_chunks = resp['response']['chunk_list']
 
-
-        chunk_have = NO_CHUNK
-        total_chunks_remaining = []
-
-        for c in total_chunks:
-            total_chunks_remaining.append(c)
-
-        ep = endpoint.DummyEndpoint(DEFAULT_PUNCHER_A, fileName, total_chunks_remaining, client) #TODO change to puncher addr
+        ep = endpoint.DummyEndpoint(DEFAULT_PUNCHER_A, client) #TODO change to puncher addr
+        ep.init_mem(fileName, 48, total_chunks)
         ep.start()
         ep.get_input()
 

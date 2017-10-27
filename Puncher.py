@@ -5,6 +5,7 @@ object is initialized. We will assume that all strings are validated.
 import Config
 import socket
 import struct
+import datetime
 from collections import defaultdict
 
 class PuncherProtocol(object):
@@ -37,8 +38,6 @@ class PuncherProtocol(object):
 class PuncherServer(object):
     def __init__(self, host, port, timeout):
         self.addr = ( host, port )
-        self.start()
-        self.t.daemon = True
     def start(self):
         # We start the UDP listener
         sockfd = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -56,12 +55,14 @@ class PuncherServer(object):
                 c_prv_addr = data_addr
                 data = (c_pub_addr, 'A')
                 print("[Puncher] Send ACK pub_addr[%s] to [%s]" % (str(data), str(c_pub_addr)))
-                client_lookup[c_pub_addr[0]][c_pub_addr[0]] = c_pub_addr
+                client_lookup[c_pub_addr[0]][c_pub_addr[1]] = c_pub_addr + (datetime.datetime.now(), )
                 sockfd.sendto(PuncherProtocol.pack(*data), c_pub_addr)
             elif msg == "C":
                 target_addr = data_addr
                 if target_addr[1]==0:
-                    target_addr = next (iter (client_lookup[target_addr[0]].values()) )
+                    vals = list(client_lookup[target_addr[0]].values())
+                    target_addr = min(vals, key = lambda t: t[2])
+                    target_addr = target_addr[0:2]
                 data = (target_addr, 'A')
                 print("[Puncher] Send CONN target_addr[%s] to [%s]" % (str(data), str(c_pub_addr)))
                 sockfd.sendto(PuncherProtocol.pack(*data), c_pub_addr)
@@ -96,8 +97,34 @@ class WeaklingProtocol(object):
     def start(self):
         self.server.start()
         self.client.start()
+        # HACK TODO
+        self.client.my_addr = self.server.my_addr
+        print("TODO, address [%s]" % str(self.client.my_addr))
     def get_identity(self):
         return self.server.get_identity()
+    @classmethod
+    def pack(cls, addr, app_data):
+        ip, port = addr
+        # IP is 32 bit data
+        data = socket.inet_aton(ip)
+        # port is a 16 bit data
+        data += struct.pack("H", port)
+        # len to capture the number of bytes
+        data += struct.pack("H", len(app_data))
+        # app_data is 1024 bits
+        data += app_data
+        print(''.join('{:02x}'.format(x) for x in app_data))
+        print(len(app_data))
+        return data
+    @classmethod
+    def unpack(cls, data):
+        host = socket.inet_ntoa(data[:4])
+        port, = struct.unpack("H", data[4:6])
+        app_len, = struct.unpack("H", data[6:8])
+        app_data = data[8:8+app_len]
+        print(''.join('{:02x}'.format(x) for x in app_data))
+        print(len(data[8:8+app_len]))
+        return (host,port), app_data
 
 import sys
 class WeaklingServer(object):
@@ -110,9 +137,10 @@ class WeaklingServer(object):
         self.id = "Dodgy"
     def thread_job(self):
         while True:
-            data, addr = self.sockfd.recvfrom(1024)
-            print("[Weakling-S] Recieve Data from %s" % str(addr))
-            self.queue.put((data, addr))
+            data, addr = self.sockfd.recvfrom(1030) # 1024+6
+            r_addr, app_data = WeaklingProtocol.unpack(data)
+            print("[Weakling-S] Recieve Data from %s, send back %s" % (str(addr), str(r_addr)))
+            self.queue.put((app_data, r_addr))
     def start(self):
         my_addr = (socket.gethostbyname(socket.gethostname()),0)
         print("[Weakling-S] Send HELLO my_addr[%s] to %s" % (str(my_addr), str(self.apuncher_addr)))
@@ -125,6 +153,7 @@ class WeaklingServer(object):
             print("[Weakling-S] Server Message fatal error.")
             sys.exit(1)
         self.id = "%s:%d" % my_addr
+        self.my_addr = my_addr
         self.t.start()
     def get_identity(self):
         return self.id
@@ -144,19 +173,22 @@ class WeaklingServer(object):
 '''
 class WeaklingClient(object):
     class Connection(object):
-        def __init__(self, addr, sock):
+        def __init__(self, my_addr, addr, sock):
+            self.my_addr = my_addr
             self.addr = addr
             self.sock = sock
-        def send(self, data):
-            print("[Weakling-C] Send Data[%s] to %s" % (str(data), str(self.addr)))
+        def send(self, app_data):
+            print("[Weakling-C-C] Send App-Data[%s] to %s" % (str(app_data), str(self.addr)))
+            #self.my_addr
+            data = WeaklingProtocol.pack(self.my_addr, app_data)
             self.sock.sendto(data, self.addr)
     def __init__(self, queue, apuncher_addr):
         self.queue = queue
         self.apuncher_addr = apuncher_addr
         self.sockfd = socket.socket( socket.AF_INET, socket.SOCK_DGRAM )
         self.conn_cache = {}
-        self.t = threading.Thread(target=self.thread_job)
-        self.t.daemon = True
+        #self.t = threading.Thread(target=self.thread_job)
+        #self.t.daemon = True
     def shutdown(self):
         self.queue.put(None)
     def thread_job(self):
@@ -165,17 +197,20 @@ class WeaklingClient(object):
             if item == None:
                 print("[Weakling-C] Stop Queue")
                 break
-            self.sockfd.sendto( item.encode('utf-8'), self.target )
+            #self.sockfd.sendto( item.encode('utf-8'), self.target )
     def connect(self, node_id, node_port=0):
         node_addr = (node_id, node_port)
+        if node_port != 0:
+            return WeaklingClient.Connection(self.my_addr, node_addr, self.sockfd)
         print("[Weakling-C] Send CONN my_addr[%s] to %s" % (str(node_addr), str(self.apuncher_addr)))
         self.sockfd.sendto(PuncherProtocol.pack(node_addr, 'C'), self.apuncher_addr)
         data, addr = self.sockfd.recvfrom(PuncherProtocol.payload_len)
         node_addr, msg = PuncherProtocol.unpack(data)
         print("[Weakling-C] Recieve Data[%s] from %s" % (str((node_addr, msg)), str(addr)))
-        return WeaklingClient.Connection(node_addr, self.sockfd)
+        return WeaklingClient.Connection(self.my_addr, node_addr, self.sockfd)
     def start(self):
-        self.t.start()
+        #self.t.start()
+        pass
 
 import queue
 import threading
@@ -189,6 +224,7 @@ class DummyEndpoint(object):
     def thread_job(self):
         while True:
             item = self.p_queue.get()
+            print("XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX")
             if item == None:
                 print("[Client] Endpoint Terminate")
                 break
@@ -224,6 +260,8 @@ class DummyEndpoint(object):
             
             #self.c_queue.put(data)
 
+from pathlib import Path
+
 class DirectoryServer(object):
     def __init__(self):
         pass
@@ -231,7 +269,14 @@ class DirectoryClient(object):
     def __init__(self):
         pass
     def list(self):
-        return [("Hello.txt", 50121), ("Hello1.txt", 50122)]
+        lock_file = Path("temp.lock")
+        if lock_file.is_file():
+            return [("demo.txt", 50121)]
+        else:
+            with open('temp.lock', 'w') as f:
+                f.write("Hello")
+        print("No files exist!")
+        return []
     def new_file(self, file_name, chunk_list):
         return True
 
