@@ -11,8 +11,8 @@ import endpoint
 
 CHUNK_SIZE = 1024
 DEFAULT_PORT = 60760
-DEFAULT_PUNCHER_A = ("13.228.183.203", 50818)
 DEFAULT_IP = "13.228.183.203"
+DEFAULT_PUNCHER_A = (DEFAULT_IP, 50818)
 
 def help():
     print ("Usage:")
