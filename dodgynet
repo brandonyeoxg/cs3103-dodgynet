@@ -10,7 +10,7 @@ import Puncher
 import endpoint
 
 CHUNK_SIZE = 1024
-DEFAULT_PORT = 9876
+DEFAULT_PORT = 60760
 DEFAULT_PUNCHER_A = ("13.228.183.203", 50818)
 DEFAULT_IP = "13.228.183.203"
 
@@ -77,7 +77,7 @@ def main():
 
     elif (clientType == "leech" and option == "download"):
         fileName = sys.argv[3]
-        portNum = 9876 #int(sys.argv[3])
+        portNum = DEFAULT_PORT
 
         client = UdpTrackerClient(DEFAULT_IP, portNum) #TODO change to file directory ip
         client.join()
