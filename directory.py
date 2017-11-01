@@ -1,57 +1,65 @@
+import protocol
+import ctypes as ct
 
-class DirectoryProtocol(object):
-    @classmethod
-    def pack(cls, dataBytes, chunkNum):
-        pass
-    @classmethod
-    def unpack(cls, data):
-        pass
+class DirPacket(ct.Structure):
+    _fields_ = [("id", ct.c_int),
+                ("ip", ct.c_int)]
 
-class DirectoryServer(object):
-    def serve_fore(self):
-        pass
-    def shutdown(self):
-        pass
+p = DirPacket()
+p.id = 123
+p.ip = 456
+packed = protocol.pack(p)
+unpacked = protocol.unpack(packed,DirPacket)
+print(protocol.debug_hex(bytearray(protocol.pack(p))))
+print(unpacked.id)
+print(unpacked.ip)
 
-class DirectoryClient(object):
-    def start(self):
-        pass
-    def shutdown(self):
-        pass
+s = DirPacket()
+s.id = 0
+s.ip = 2
+print(protocol.debug_hex(bytearray(protocol.pack(s))))
 
+class DirServer(protocol.ThreadedTCPServer):
+    def __init__(self, addr=('', 50817)):
+        protocol.ThreadedTCPServer.__init__(self, addr, DirHandler, DirPacket)
+        self.arg = []
 
-import socketserver
+class DirClient(protocol.TCPClient):
+    def __init__(self):
+        protocol.TCPClient.__init__(self, ('localhost', 50817), DirPacket)
 
-class MyTCPHandler(socketserver.BaseRequestHandler):
+class DirHandler(protocol.Handler):
     def setup(self):
         print("Connection received from %s" % str(self.client_address))
-        self.request.sendall("Welcome!\n".encode('utf-8'))
+        ppp = DirPacket()
+        ppp.id = 123
+        ppp.ip = 456
+        packed = protocol.pack(ppp)
+        unpacked = protocol.unpack(packed,DirPacket)
+        print(protocol.debug_hex(bytearray(protocol.pack(ppp))))
+        print(unpacked.id)
+        print(unpacked.ip)
+        print(protocol.debug_hex(bytearray(protocol.pack(unpacked))))
+        self.send(ppp)
     def handle(self):
-        print(self.server.arg)
         while True:
+            print(self.server.arg)
             # self.request is the TCP socket connected to the client
-            self.data = self.request.recv(1024).strip()
-            self.server.arg.append(self.data.decode('utf-8'))
-            if self.data == "q".encode('utf-8'):
+            self.data = self.recv()
+            self.server.arg.append(self.data.id)
+            if protocol.unpack(self.data.ip) == "QQQQ":
                 break
             print("{} wrote:".format(self.client_address[0]))
-            print(self.data)
+            print(self.id)
             # just send back the same data, but upper-cased
-            self.request.sendall(self.data.upper())
+            self.request.sendall(s)
     def finish(self):
-        self.request.sendall("Goodbye!  Please come back soon.".encode('utf-8'))
-
-class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
-    daemon_threads = True
-    allow_reuse_address = True
-    def __init__(self, port, RequestHandlerClass):
-        socketserver.TCPServer.__init__(self, ('', port), RequestHandlerClass)
-        self.arg = []
+        self.request.sendall(s)
 
 if __name__ == "__main__":
 
     # Create the server, binding to localhost on port 9999
-    server = ThreadedTCPServer(9999, MyTCPHandler)
+    server = DirServer()
 
     # Activate the server; this will keep running until you
     # interrupt the program with Ctrl-C

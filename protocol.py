@@ -1,29 +1,67 @@
-import socket
 from ctypes import *
+import socket
+import socketserver
 
-class Protocol():
-    @classmethod
-    def pack(cls, obj):
-        return cast(byref(obj), POINTER(c_char * sizeof(obj)))
-    @classmethod
-    def unpack(cls, bin_arr, Type):
-        obj = Type()
-        memmove(pointer(obj), bin_arr, sizeof(obj))
-        return obj
-    @classmethod
-    def pack_ip(cls, obj):
-        return (c_ubyte*4)(*(socket.inet_aton(obj)))
-    @classmethod
-    def unpack_ip(cls, bin_arr):
-        return socket.inet_ntoa(bytearray(bin_arr))
-    @classmethod
-    def pack_str(cls, obj, size):
-        bytes = obj.encode('utf-8')
-        return (c_ubyte*size)(*(bytes))
-    @classmethod
-    def unpack_str(cls, bin_arr, size):
-        bytes_arr = bytearray(bin_arr)
-        return bytes_arr.decode('utf-8')
+def pack(obj):
+    print(obj.id)
+    print(byref(obj))
+    return cast(byref(obj), POINTER(c_char * sizeof(obj)))
+def unpack(bin_arr, Type):
+    obj = Type()
+    memmove(pointer(obj), bin_arr, sizeof(obj))
+    return obj
+def pack_ip(obj):
+    return (c_ubyte*4)(*(socket.inet_aton(obj)))
+def unpack_ip(bin_arr):
+    return socket.inet_ntoa(bytearray(bin_arr))
+def pack_str(obj, size):
+    bytes = obj.encode('utf-8')
+    return (c_ubyte*size)(*(bytes))
+def unpack_str(bin_arr, size):
+    bytes_arr = bytearray(bin_arr)
+    return bytes_arr.decode('utf-8')
+def debug_hex(bin_arr):
+    return ':'.join(format(x, '02x') for x in bin_arr).upper()
+
+class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+    def __init__(self, addr, RequestHandlerClass, Type):
+        socketserver.TCPServer.__init__(self, addr, RequestHandlerClass)
+        self.Type = Type
+        self.size = sizeof(Type())
+
+class TCPClient(object):
+    def __init__(self, addr, Type):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.connect(addr)
+        self.size = sizeof(Type())
+        self.Type = Type
+    def send(self, obj):
+        bin_arr = pack(obj)
+        print(debug_hex(bytearray(bin_arr)))
+        self.socket.sendall(bin_arr)
+    def recv(self):
+        bin_arr = self.socket.recv(self.size)
+        print(debug_hex(bin_arr))
+        return unpack(bin_arr, self.Type)
+
+
+class Handler(socketserver.BaseRequestHandler):
+    def setup(self):
+        pass
+    def handle(self):
+        pass
+    def finish(self):
+        pass
+    def send(self, obj):
+        bin_arr = pack(obj)
+        print(debug_hex(bytearray(bin_arr)))
+        self.request.sendall(bin_arr)
+    def recv(self):
+        bin_arr = self.request.recv(self.server.size)
+        print(debug_hex(bin_arr))
+        return unpack(bin_arr, self.server.Type)
 
 class Packet(Structure):
     _fields_ = [("id", c_ubyte * 4),
@@ -31,21 +69,20 @@ class Packet(Structure):
                 ("ip", c_ubyte * 4)]
 
 p = Packet()
-p.id = Protocol.pack_str("H", 4)
-p.ce = 255
-p.ip = Protocol.pack_ip('255.255.255.255')
+p.id = pack_str("H", 4)
+p.ip = pack_ip('255.255.255.255')
 
 print(sizeof(p))
 
 # cast the struct to a pointer to a char array
-pdata = Protocol.pack(p)
+pdata = pack(p)
 # now you can just save/send the struct data
 dd = pdata.contents.raw
-print(':'.join(format(x, '02x') for x in dd).upper())
+print()
 
-p = Protocol.unpack(pdata, Packet)
-print(Protocol.unpack_str(p.id, 4))
+p = unpack(pdata, Packet)
+print(unpack_str(p.id, 4))
 print(p.ce)
-print(Protocol.unpack_ip(p.ip))
+print(unpack_ip(p.ip))
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=80:
