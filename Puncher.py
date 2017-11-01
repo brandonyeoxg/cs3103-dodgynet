@@ -26,6 +26,7 @@ class PuncherProtocol(object):
         #   H - hello
         #   C - connect
         #   A - ack
+        #   P - punch
         data += struct.pack("c", msg.encode("utf-8"))
         return data
     @classmethod
