@@ -60,7 +60,9 @@ def main(arguments):
     dict_subparsers['download'].add_argument('dodgy_file', help=".dodgy file to start downloading from.", 
         type=argparse.FileType('r'))
     dict_subparsers['download'].add_argument('-c', '--cache', help="Folder to use as cache.", 
-        default=None, type=argparse.FileType('r'))
+        default="cache", type=str)
+    dict_subparsers['download'].add_argument('-o', '--out', help="Saves the downloaded file to this location.", 
+        default=None, type=argparse.FileType('w'))
 
     args = parser.parse_args(arguments)
 
