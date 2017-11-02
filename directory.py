@@ -47,10 +47,10 @@ class DirHandler(protocol.Handler):
             # self.request is the TCP socket connected to the client
             self.data = self.recv()
             self.server.arg.append(self.data.id)
-            if protocol.unpack(self.data.ip) == "QQQQ":
+            if self.data.ip == 0:
                 break
             print("{} wrote:".format(self.client_address[0]))
-            print(self.id)
+            print(self.data.id)
             # just send back the same data, but upper-cased
             self.request.sendall(s)
     def finish(self):
