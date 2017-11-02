@@ -15,7 +15,13 @@ Private IP/NAT using the Puncher protocol to punch through the firewall
 and/or NAT.
 """
 
-possible_actions = ["upload", "join", "list", "query", "download"]
+doc_string = {
+    'list' : "List the files on the directory server that are avaliable.",
+    'query': "Queries the directory server for a specified file and downloads the .dodgy that contains the download information.",
+    'upload': "Registers a new file with the server and start seeding.",
+    'seed': "Start seeding for the .dodgy file.",
+    'download': "Start downloading the file represented by the .dodgy file."
+}
 
 def main(arguments):
 
@@ -24,24 +30,53 @@ def main(arguments):
     parser = argparse.ArgumentParser(
             description=__doc__,
             formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('action', help="Action to be performed, possible actions: %s" % ', '.join(possible_actions), 
-            type=str, choices=possible_actions, metavar='action')
-    parser.add_argument('-f', '--file', help="Target file to download from the"
-            " directory server.", 
-            default=sys.stdin, type=argparse.FileType('r'))
     parser.add_argument('-s', '--server', help="Address of the server",
             type=str, default="e2empire.com")
 
+    subparsers = parser.add_subparsers(dest="action", 
+        help="Action to be performed, possible actions: %s. Type -h with the action provided to see manual about the action."
+        % ', '.join(doc_string.keys()), metavar='action')
+        
+    # Init all the parsers
+    dict_subparsers = {}
+    for k,v in doc_string.items():
+        dict_subparsers[k] = subparsers.add_parser(k, description=v)
+
+    dict_subparsers['query'].add_argument('file', help="File to query from the directory server.", 
+        type=argparse.FileType('r'))
+    dict_subparsers['query'].add_argument('-o', '--out', help="Saves the queried .dodgy file to this path, defaults to {file}.dodgy", 
+        default=None, type=argparse.FileType('w'))
+
+    dict_subparsers['upload'].add_argument('file', help="File to be uploaded to the directory server.", 
+        type=argparse.FileType('r'))
+    dict_subparsers['upload'].add_argument('description', help="Short description of the file.", 
+        type=str)
+
+    dict_subparsers['seed'].add_argument('dodgy_file', help=".dodgy file to start seeding from.", 
+        type=argparse.FileType('r'))
+    dict_subparsers['seed'].add_argument('-f', '--file', help="Specific location of file corresponding to the .dodgy file to seed.", 
+        default=None, type=argparse.FileType('r'))
+
+    dict_subparsers['download'].add_argument('dodgy_file', help=".dodgy file to start downloading from.", 
+        type=argparse.FileType('r'))
+    dict_subparsers['download'].add_argument('-c', '--cache', help="Folder to use as cache.", 
+        default=None, type=argparse.FileType('r'))
+
     args = parser.parse_args(arguments)
 
-    logger = logging.getLogger()
-    logger.info(args)
+    logging.info(args)
 
     if args.action == "list":
-        logger.debug("Listing files from the server.")
+        logging.debug("Listing files from the server.")
         dir_client = directory.DirClient()
         dir_client.list()
         dir_client.bye()
+    elif args.action == "query":
+        
+        dir_client = directory.DirClient()
+        dir_client.list()
+    elif args.action == "upload":
+        logging.debug("Uploading new file to server and start seeding.")
     else:
         print("stub")
 

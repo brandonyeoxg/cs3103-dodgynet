@@ -11,6 +11,7 @@ class DirCode(Enum):
     REGISTER = 2    # Client
     QUERY = 3       # Client
 
+# Add number of chunks
 class DirPacket(ct.Structure):
     NAME_LEN = 255
     DESC_LEN = 743
@@ -117,12 +118,12 @@ class DirHandler(protocol.Handler):
 
 #self.server.file_list.append(self.data.id)
 
+'''
 p=DirPacket()
 print("SIZE OF PACKET")
 print(ct.sizeof(p))
 print(DirCode.BYE.value)
 print(DirCode(0) == DirCode.BYE)
-'''
 p.id = 123
 packed = protocol.pack(p)
 unpacked = protocol.unpack(packed,DirPacket)
