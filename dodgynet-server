@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+
+import os
+import sys
+import argparse
+import logging
+import directory
+
+"""
+DodgyNet-Server is a peer to peer file file sharing daemon that implements the 
+DodgyNet protocol using the Happy Tracker and Puncher protocols to achieve
+a fair and efficient file sharing. We designed the P2P system to work over
+Private IP/NAT using the Puncher protocol to punch through the firewall
+and/or NAT.
+"""
+
+possible_servers = ["all", "directory", "tracker", "puncher"]
+
+def main(arguments):
+
+    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s [%(process)-5d] %(filename)s +%(lineno)s: %(message)s')
+
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument('server', help="Server to start, possible servers: %s" % ', '.join(possible_servers), 
+            type=str, choices=possible_servers, metavar='server', default='all',
+            const='all', nargs='?')
+
+    args = parser.parse_args(arguments)
+    logger = logging.getLogger()
+
+    print("""\
+
+ /$$$$$$$                  /$$                     /$$   /$$             /$$    
+| $$__  $$                | $$                    | $$$ | $$            | $$    
+| $$  \ $$  /$$$$$$   /$$$$$$$  /$$$$$$  /$$   /$$| $$$$| $$  /$$$$$$  /$$$$$$  
+| $$  | $$ /$$__  $$ /$$__  $$ /$$__  $$| $$  | $$| $$ $$ $$ /$$__  $$|_  $$_/  
+| $$  | $$| $$  \ $$| $$  | $$| $$  \ $$| $$  | $$| $$  $$$$| $$$$$$$$  | $$    
+| $$  | $$| $$  | $$| $$  | $$| $$  | $$| $$  | $$| $$\  $$$| $$_____/  | $$ /$$
+| $$$$$$$/|  $$$$$$/|  $$$$$$$|  $$$$$$$|  $$$$$$$| $$ \  $$|  $$$$$$$  |  $$$$/
+|_______/  \______/  \_______/ \____  $$ \____  $$|__/  \__/ \_______/   \___/  
+                               /$$  \ $$ /$$  | $$                              
+                              |  $$$$$$/|  $$$$$$/                              
+                               \______/  \______/                               
+    """)
+    logger.info("Welcome! Starting DodgyNet Server...")
+    logger.info("Starting server(s) with arguments %s" % str(args))
+
+    # Create the server, binding to localhost on port 9999
+    server = directory.DirServer()
+
+    # Activate the server; this will keep running until you
+    # interrupt the program with Ctrl-C
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    server.shutdown()
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
+
+# vim: expandtab shiftwidth=4 softtabstop=4 textwidth=80:

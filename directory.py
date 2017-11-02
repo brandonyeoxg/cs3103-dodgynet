@@ -1,28 +1,31 @@
+from enum import Enum
 import protocol
 import ctypes as ct
+from pprint import pprint
+import logging
+
+class DirCode(Enum):
+    BYE = 0         # Client
+    LIST = 1        # Client
+    RESPONSE = 2    # Server
+    REGISTER = 3    # Client
+    QUERY = 4       # Client
 
 class DirPacket(ct.Structure):
     _fields_ = [("id", ct.c_int),
-                ("ip", ct.c_int)]
-
-p = DirPacket()
-p.id = 123
-p.ip = 456
-packed = protocol.pack(p)
-unpacked = protocol.unpack(packed,DirPacket)
-print(protocol.debug_hex(bytearray(protocol.pack(p))))
-print(unpacked.id)
-print(unpacked.ip)
-
-s = DirPacket()
-s.id = 0
-s.ip = 2
-print(protocol.debug_hex(bytearray(protocol.pack(s))))
+                ("action", ct.c_ubyte),
+                ("name_len", ct.c_ubyte),
+                ("name", ct.c_char * 255),
+                ("description_len", ct.c_int),
+                ("description", ct.c_char * 743),
+                ("n_peers", ct.c_int),
+                ("ip", ct.c_ubyte * 4),
+                ("port", ct.c_ushort)]
 
 class DirServer(protocol.ThreadedTCPServer):
     def __init__(self, addr=('', 50817)):
         protocol.ThreadedTCPServer.__init__(self, addr, DirHandler, DirPacket)
-        self.arg = []
+        self.file_list = []
 
 class DirClient(protocol.TCPClient):
     def __init__(self):
@@ -30,43 +33,31 @@ class DirClient(protocol.TCPClient):
 
 class DirHandler(protocol.Handler):
     def setup(self):
-        print("Connection received from %s" % str(self.client_address))
-        ppp = DirPacket()
-        ppp.id = 123
-        ppp.ip = 456
-        packed = protocol.pack(ppp)
-        unpacked = protocol.unpack(packed,DirPacket)
-        print(protocol.debug_hex(bytearray(protocol.pack(ppp))))
-        print(unpacked.id)
-        print(unpacked.ip)
-        print(protocol.debug_hex(bytearray(protocol.pack(unpacked))))
-        self.send(ppp)
+        logging.debug("Connected %s:%d" % self.client_address)
     def handle(self):
         while True:
-            print(self.server.arg)
+            logging.debug(self.server.file_list)
             # self.request is the TCP socket connected to the client
             self.data = self.recv()
-            self.server.arg.append(self.data.id)
-            if self.data.ip == 0:
+            self.server.file_list.append(self.data.id)
+            if self.data.id == 0:
                 break
-            print("{} wrote:".format(self.client_address[0]))
-            print(self.data.id)
             # just send back the same data, but upper-cased
-            self.request.sendall(s)
     def finish(self):
-        self.request.sendall(s)
+        logging.debug("Disconnected %s:%d" % self.client_address)
 
-if __name__ == "__main__":
+'''
+p=DirPacket()
+print("SIZE OF PACKET")
+print(ct.sizeof(p))
+p.id = 123
+packed = protocol.pack(p)
+unpacked = protocol.unpack(packed,DirPacket)
+print(protocol.debug_hex(bytearray(protocol.pack(p))))
 
-    # Create the server, binding to localhost on port 9999
-    server = DirServer()
-
-    # Activate the server; this will keep running until you
-    # interrupt the program with Ctrl-C
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    server.shutdown()
+s = DirPacket()
+s.id = 0
+print(protocol.debug_hex(bytearray(protocol.pack(s))))
+'''
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=80:

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+import os
+import sys
+import argparse
+import logging
 
 """
 DodgyNet is a peer to peer file file sharing program that implements the 
@@ -8,11 +12,6 @@ a fair and efficient file sharing. We designed the P2P system to work over
 Private IP/NAT using the Puncher protocol to punch through the firewall
 and/or NAT.
 """
-
-import os
-import sys
-import argparse
-import logging
 
 possible_actions = ["upload", "join", "list", "query", "download"]
 
@@ -34,6 +33,7 @@ def main(arguments):
             type=str, default="e2empire.com")
 
     args = parser.parse_args(arguments)
+
     logger = logging.getLogger()
     logger.info(args)
     #print(args['action'])
