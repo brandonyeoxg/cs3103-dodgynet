@@ -3,12 +3,11 @@ import socket
 import socketserver
 
 def pack(obj):
-    print(obj.id)
-    print(byref(obj))
-    return cast(byref(obj), POINTER(c_char * sizeof(obj)))
-def unpack(bin_arr, Type):
-    obj = Type()
-    memmove(pointer(obj), bin_arr, sizeof(obj))
+    buf = string_at(byref(obj), sizeof(obj))
+    return buf
+def unpack(buf, Type):
+    cstring = create_string_buffer(buf)
+    obj = cast(pointer(cstring), POINTER(Type)).contents
     return obj
 def pack_ip(obj):
     return (c_ubyte*4)(*(socket.inet_aton(obj)))
@@ -45,7 +44,8 @@ class TCPClient(object):
         bin_arr = self.socket.recv(self.size)
         print(debug_hex(bin_arr))
         return unpack(bin_arr, self.Type)
-
+    def close(self):
+        self.socket.close()
 
 class Handler(socketserver.BaseRequestHandler):
     def setup(self):
@@ -77,8 +77,8 @@ print(sizeof(p))
 # cast the struct to a pointer to a char array
 pdata = pack(p)
 # now you can just save/send the struct data
-dd = pdata.contents.raw
-print()
+#dd = pdata.contents.raw
+print(pdata)
 
 p = unpack(pdata, Packet)
 print(unpack_str(p.id, 4))
