@@ -4,6 +4,8 @@ import os
 import sys
 import argparse
 import logging
+import commons
+import directory
 
 """
 DodgyNet is a peer to peer file file sharing program that implements the 
@@ -17,27 +19,31 @@ possible_actions = ["upload", "join", "list", "query", "download"]
 
 def main(arguments):
 
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(filename)s: +%(lineno)s: %(levelname)-8s [%(process)d] %(message)s')
+    logging.basicConfig(level=logging.DEBUG, format=commons.logger_format)
 
     parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+            description=__doc__,
+            formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('action', help="Action to be performed, possible actions: %s" % ', '.join(possible_actions), 
             type=str, choices=possible_actions, metavar='action')
     parser.add_argument('-f', '--file', help="Target file to download from the"
             " directory server.", 
             default=sys.stdin, type=argparse.FileType('r'))
-    parser.add_argument('-o', '--out', help="Output file path, saves the"
-            " downloaded file to this path.", default=None, type=str)
-    parser.add_argument('-d', '--dir', help="Address of the directory server",
+    parser.add_argument('-s', '--server', help="Address of the server",
             type=str, default="e2empire.com")
 
     args = parser.parse_args(arguments)
 
     logger = logging.getLogger()
     logger.info(args)
-    #print(args['action'])
-    print(args)
+
+    if args.action == "list":
+        logger.debug("Listing files from the server.")
+        dir_client = directory.DirClient()
+        dir_client.list()
+        dir_client.bye()
+    else:
+        print("stub")
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))

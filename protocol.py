@@ -16,11 +16,14 @@ def pack_ip(obj):
 def unpack_ip(bin_arr):
     return socket.inet_ntoa(bytearray(bin_arr))
 def pack_str(obj, size):
+    return obj.encode('utf-8')
     bytes = obj.encode('utf-8')
     return (c_ubyte*size)(*(bytes))
 def unpack_str(bin_arr, size):
     bytes_arr = bytearray(bin_arr)
     return bytes_arr.decode('utf-8')
+def unpack_str_s(bin_arr, size, actual_size):
+    return unpack_str(bin_arr, size)[:actual_size]
 def debug_hex(bin_arr):
     hex_str = ':'.join(format(x, '02x') for x in bin_arr).upper()
     return re.sub(r'(:00)+', ':*', hex_str)
@@ -41,13 +44,14 @@ class TCPClient(object):
         self.Type = Type
     def send(self, obj):
         bin_arr = pack(obj)
-        logging.debug("Packed: %s" % debug_hex(bytearray(bin_arr)))
+        logging.debug("Client sent: %s" % debug_hex(bytearray(bin_arr)))
         self.socket.sendall(bin_arr)
     def recv(self):
         bin_arr = self.socket.recv(self.size)
-        logging.debug("Unpacked: %s" % debug_hex(bin_arr))
+        logging.debug("Client recv: %s" % debug_hex(bin_arr))
         return unpack(bin_arr, self.Type)
     def close(self):
+        logging.debug("Closing socket.")
         self.socket.close()
 
 class Handler(socketserver.BaseRequestHandler):
@@ -59,11 +63,11 @@ class Handler(socketserver.BaseRequestHandler):
         pass
     def send(self, obj):
         bin_arr = pack(obj)
-        logging.debug("Packed: %s" % debug_hex(bytearray(bin_arr)))
+        logging.debug("Server sent: %s" % debug_hex(bytearray(bin_arr)))
         self.request.sendall(bin_arr)
     def recv(self):
         bin_arr = self.request.recv(self.server.size)
-        logging.debug("Unpacked: %s" % debug_hex(bin_arr))
+        logging.debug("Server recv: %s" % debug_hex(bin_arr))
         return unpack(bin_arr, self.server.Type)
 
 class Packet(Structure):

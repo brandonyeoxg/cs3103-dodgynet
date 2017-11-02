@@ -5,6 +5,9 @@ import sys
 import argparse
 import logging
 import directory
+import commons
+import pickle
+import logging
 
 """
 DodgyNet-Server is a peer to peer file file sharing daemon that implements the 
@@ -14,49 +17,54 @@ Private IP/NAT using the Puncher protocol to punch through the firewall
 and/or NAT.
 """
 
+class Server(object):
+    def __init__(self, state_file):
+        self.state_file = state_file
+        try:
+            state = pickle.load(open(state_file, "rb"))
+            logging.debug("Loaded state file %s" % state_file)
+            self.dir_server = directory.DirServer(state['dir'])
+        except (OSError, IOError) as e:
+            logging.debug("No state file, starting afresh.")
+            self.dir_server = directory.DirServer([p])
+    def serve_forever(self):
+        self.dir_server.serve_forever()
+    def shutdown(self):
+        self.dir_server.shutdown()
+    def save_state(self):
+        state = {}
+        state['dir'] = self.dir_server.get_state()
+        pickle.dump(state, open(self.state_file, "wb"))
+
 possible_servers = ["all", "directory", "tracker", "puncher"]
 
 def main(arguments):
 
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-8s [%(process)-5d] %(filename)s +%(lineno)s: %(message)s')
+    logging.basicConfig(level=logging.DEBUG, format=commons.logger_format)
 
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('server', help="Server to start, possible servers: %s" % ', '.join(possible_servers), 
+    parser.add_argument('server', help="Server to start, possible servers: %s" 
+            % ', '.join(possible_servers), 
             type=str, choices=possible_servers, metavar='server', default='all',
             const='all', nargs='?')
+    parser.add_argument('-sf', '--state_file', help="State file of the server"
+            ", retrieve and save to.", default="server.state", type=str)
 
     args = parser.parse_args(arguments)
-    logger = logging.getLogger()
 
-    print("""\
+    print(commons.ascii_art_logo)
+    logging.info("Welcome! Starting DodgyNet Server...")
+    logging.debug("Starting server(s) with arguments %s" % str(args))
 
- /$$$$$$$                  /$$                     /$$   /$$             /$$    
-| $$__  $$                | $$                    | $$$ | $$            | $$    
-| $$  \ $$  /$$$$$$   /$$$$$$$  /$$$$$$  /$$   /$$| $$$$| $$  /$$$$$$  /$$$$$$  
-| $$  | $$ /$$__  $$ /$$__  $$ /$$__  $$| $$  | $$| $$ $$ $$ /$$__  $$|_  $$_/  
-| $$  | $$| $$  \ $$| $$  | $$| $$  \ $$| $$  | $$| $$  $$$$| $$$$$$$$  | $$    
-| $$  | $$| $$  | $$| $$  | $$| $$  | $$| $$  | $$| $$\  $$$| $$_____/  | $$ /$$
-| $$$$$$$/|  $$$$$$/|  $$$$$$$|  $$$$$$$|  $$$$$$$| $$ \  $$|  $$$$$$$  |  $$$$/
-|_______/  \______/  \_______/ \____  $$ \____  $$|__/  \__/ \_______/   \___/  
-                               /$$  \ $$ /$$  | $$                              
-                              |  $$$$$$/|  $$$$$$/                              
-                               \______/  \______/                               
-    """)
-    logger.info("Welcome! Starting DodgyNet Server...")
-    logger.info("Starting server(s) with arguments %s" % str(args))
-
-    # Create the server, binding to localhost on port 9999
-    server = directory.DirServer()
-
-    # Activate the server; this will keep running until you
-    # interrupt the program with Ctrl-C
+    server = Server(args.state_file)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         pass
     server.shutdown()
+    server.save_state()
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
