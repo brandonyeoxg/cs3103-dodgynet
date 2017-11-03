@@ -1,3 +1,5 @@
+from enum import Enum
+import ctypes as ct
 import socket
 import struct
 import time
@@ -5,6 +7,57 @@ from ipaddress import ip_address
 from UdpTrackerCommons import *
 import threading
 
+class TrackerCode(Enum):
+    BYE = 0
+    JOIN = 1
+    ANNOUNCE = 2
+    WANT = 3
+
+# Add number of chunks
+# Add file hash
+class TrackerPacket(ct.Structure):
+    NAME_LEN = 255
+    DESC_LEN = 723
+    _fields_ = [("connection_id", ct.c_ubyte * 8),
+                ("action", ct.c_ubyte * 4),
+                ("transaction_id", ct.c_ubyte * 4),
+                ("peer_id", ct.c_ubyte * 4),
+                ("variable_data1", ct.c_ubyte * 4), # Represents in [Announce Request: Client IPv4] [Want Request: Client IPv4] [Want Response: Peer A IPv4]
+                ("variable_data2", ct.c_ubyte * 4), # Represents in [Announce Request: Num Chunk Have] [Want Request: Num Chunk Want] [Want Response: Peer A peer id]
+                ("variable_data3", ct.c_ubyte * 4), # Represents [Want Response: Peer B IPv4]
+                ("variable_data4", ct.c_ubyte * 4)] # Represents [Want Response: Peer B peer id]
+    def set_action(self, action):
+        self.action = action.value
+    def get_action(self):
+        return TrackerCode(self.action)
+    def set_connection_id(self, connection_id):
+        self.connection_id = connection_id
+    def get_connection_id(self):
+        return self.connection_id
+    def set_transaction_id(self, transaction_id):
+        self.transaction_id = transaction_id
+    def get_transaction_id(self):
+        return self.transaction_id
+    def set_peer_id(self, peer):
+        self.peer_id = peer;
+    def get_peer_id(self):
+        return self.peer_id
+    def set_variable_data1(self, data1):
+        self.variable_data1 = data1
+    def get_variable_data1(self):
+        return self.variable_data1
+    def set_variable_data2(self, data2):
+        self.variable_data2 = data2
+    def get_variable_data2(self):
+        return self.variable_data2
+    def set_variable_data3(self, data3):
+        self.variable_data3 = data3
+    def get_variable_data3(self):
+        return self.variable_data3
+    def set_variable_data4(self, data4):
+        self.variable_data3 = data4
+    def get_variable_data4(self):
+        return self.variable_data4
 """
     Tracker for working with udp based tracking protocol on the server side
 
