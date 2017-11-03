@@ -14,6 +14,9 @@ class DirCode(Enum):
     REGISTER = 2    # Client
     QUERY = 3       # Client
 
+PORT = 50819
+PUB_IP = "127.0.0.1"
+
 # Add number of chunks
 # Add file hash
 class DirPacket(ct.Structure):
@@ -57,24 +60,29 @@ class DirPacket(ct.Structure):
         return self.get_name()
 
 class DirServer(protocol.ThreadedTCPServer):
-    def __init__(self, file_lookup={}, addr=('', 50817)):
+    def __init__(self, file_lookup={}, tracker_ip=PUB_IP, addr=('', PORT)):
         logging.debug("Starting DirServer.")
         protocol.ThreadedTCPServer.__init__(self, addr, DirHandler, DirPacket)
         self.file_lookup = file_lookup
         self.tracker_lookup = {}
+        self.tracker_ip = tracker_ip
+        self.dir_port = 50819
         for f in self.file_lookup.values():
             self.start_tracker(f.port)
     def get_state(self):
         return self.file_lookup
     def start_tracker(self, port):
         logging.debug("[STUB]Create new Tracker at port=%d" % port)
+        self.tracker_lookup[port] = []
+    def next_port(self):
+        return len(self.tracker_lookup) + self.dir_port + 1
 
 class DirClient(protocol.TCPClient):
     headers = ["#", "File Name", "Description", "#Peers", 
                 "Tracker Address", "MD5", "Size"]
     def __init__(self):
         logging.debug("Starting DirClient.")
-        protocol.TCPClient.__init__(self, ('localhost', 50817), DirPacket)
+        protocol.TCPClient.__init__(self, (PUB_IP, PORT), DirPacket)
     def bye(self):
         logging.debug("Initiate shutdown.")
         p = DirPacket()
@@ -175,14 +183,13 @@ class DirHandler(protocol.Handler):
                     self.send(r)
                 else:
                     r.id = len(self.server.file_lookup) + 1
+                    r.set_addr((self.server.tracker_ip, self.server.next_port()))
                     self.server.file_lookup[r.get_name()] = r
                     self.send(r)
-                #self.id 
+                    self.server.start_tracker(r.port)
             # just send back the same data, but upper-cased
     def finish(self):
         logging.debug("Disconnected %s:%d" % self.client_address)
-
-#self.server.file_list.append(self.data.id)
 
 '''
 p=DirPacket()
