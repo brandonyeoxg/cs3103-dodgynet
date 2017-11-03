@@ -24,9 +24,17 @@ def unpack_str(bin_arr, size):
     return bytes_arr.decode('utf-8')
 def unpack_str_s(bin_arr, size, actual_size):
     return unpack_str(bin_arr, size)[:actual_size]
+    
+def b2cb(bytes, size):
+    return (c_ubyte * size)(*(bytes))
+def cb2b(c_bytes):
+    return bytearray(c_bytes)
+
 def debug_hex(bin_arr):
-    hex_str = ':'.join(format(x, '02x') for x in bin_arr).upper()
+    hex_str = hex(bin_arr)
     return re.sub(r'(:00)+', ':*', hex_str)
+def hex(bytes, delim=':'):
+    return delim.join(format(x, '02x') for x in bytes).upper()
 
 class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     daemon_threads = True

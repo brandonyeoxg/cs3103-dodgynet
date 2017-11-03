@@ -27,7 +27,17 @@ class Server(object):
             self.dir_server = directory.DirServer(state['dir'])
         except (OSError, IOError) as e:
             logging.debug("No state file, starting afresh.")
-            self.dir_server = directory.DirServer([p])
+            # For testing only
+            d = {}
+            '''
+            p = directory.DirPacket()
+            p.id = 1
+            p.set_name("Fedora.iso")
+            p.set_desc("Good open source software.")
+            p.set_addr(("127.0.0.1", 12345))
+            d[p.get_name()] = p
+            '''
+            self.dir_server = directory.DirServer(d)
     def serve_forever(self):
         self.dir_server.serve_forever()
     def shutdown(self):
@@ -41,7 +51,7 @@ possible_servers = ["all", "directory", "tracker", "puncher"]
 
 def main(arguments):
 
-    logging.basicConfig(level=logging.DEBUG, format=commons.logger_format)
+    logging.basicConfig(level=logging.DEBUG, format=commons.logger_debug_format)
 
     parser = argparse.ArgumentParser(
         description=__doc__,

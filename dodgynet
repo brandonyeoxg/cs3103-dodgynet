@@ -25,14 +25,14 @@ doc_string = {
 
 def main(arguments):
 
-    logging.basicConfig(level=logging.DEBUG, format=commons.logger_format)
-
     parser = argparse.ArgumentParser(
-            description=__doc__,
-            formatter_class=argparse.RawDescriptionHelpFormatter)
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-s', '--server', help="Address of the server",
-            type=str, default="e2empire.com")
-
+        type=str, default="e2empire.com")
+    parser.add_argument('--debug', action='store_true', 
+        help='Turns debug mode on.')
+            
     subparsers = parser.add_subparsers(dest="action", 
         help="Action to be performed, possible actions: %s. Type -h with the action provided to see manual about the action."
         % ', '.join(doc_string.keys()), metavar='action')
@@ -43,30 +43,34 @@ def main(arguments):
         dict_subparsers[k] = subparsers.add_parser(k, description=v)
 
     dict_subparsers['query'].add_argument('file', help="File to query from the directory server.", 
-        type=argparse.FileType('r'))
+        type=str)
     dict_subparsers['query'].add_argument('-o', '--out', help="Saves the queried .dodgy file to this path, defaults to {file}.dodgy", 
-        default=None, type=argparse.FileType('w'))
+        default=None, type=argparse.FileType('wb'))
 
     dict_subparsers['upload'].add_argument('file', help="File to be uploaded to the directory server.", 
-        type=argparse.FileType('r'))
+        type=argparse.FileType('rb'))
     dict_subparsers['upload'].add_argument('description', help="Short description of the file.", 
         type=str)
 
     dict_subparsers['seed'].add_argument('dodgy_file', help=".dodgy file to start seeding from.", 
-        type=argparse.FileType('r'))
-    dict_subparsers['seed'].add_argument('-f', '--file', help="Specific location of file corresponding to the .dodgy file to seed.", 
-        default=None, type=argparse.FileType('r'))
+        type=argparse.FileType('rb'))
+    dict_subparsers['seed'].add_argument('file', help="Specific location of file corresponding to the .dodgy file to seed.", 
+        type=argparse.FileType('rb'))
 
     dict_subparsers['download'].add_argument('dodgy_file', help=".dodgy file to start downloading from.", 
-        type=argparse.FileType('r'))
+        type=argparse.FileType('rb'))
     dict_subparsers['download'].add_argument('-c', '--cache', help="Folder to use as cache.", 
         default="cache", type=str)
     dict_subparsers['download'].add_argument('-o', '--out', help="Saves the downloaded file to this location.", 
-        default=None, type=argparse.FileType('w'))
+        default=None, type=argparse.FileType('wb'))
 
     args = parser.parse_args(arguments)
 
-    logging.info(args)
+    if args.debug == True:
+        logging.basicConfig(level=logging.DEBUG, format=commons.logger_debug_format)
+    else:
+        logging.basicConfig(level=logging.INFO, format=commons.logger_consumer_format)
+    logging.debug(args)
 
     if args.action == "list":
         logging.debug("Listing files from the server.")
@@ -74,11 +78,15 @@ def main(arguments):
         dir_client.list()
         dir_client.bye()
     elif args.action == "query":
-        
+        logging.debug("Query server and download dodgy file.")
         dir_client = directory.DirClient()
-        dir_client.list()
+        dir_client.query(args.file, args.out)
+        dir_client.bye()
     elif args.action == "upload":
         logging.debug("Uploading new file to server and start seeding.")
+        dir_client = directory.DirClient()
+        dir_client.register(args.file, args.description)
+        dir_client.bye()
     else:
         print("stub")
 

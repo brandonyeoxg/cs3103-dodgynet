@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-logger_format = '%(asctime)s %(levelname)-8s'\
+logger_debug_format = '%(asctime)s %(levelname)-8s'\
 ' [%(process)-5d] %(filename)s +%(lineno)s: %(message)s'
+logger_consumer_format = '%(message)s'
 
 ascii_art_logo = """\
 
