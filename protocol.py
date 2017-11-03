@@ -43,6 +43,14 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
         socketserver.TCPServer.__init__(self, addr, RequestHandlerClass)
         self.Type = Type
         self.size = sizeof(Type())
+        
+class ThreadedUDPServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+    def __init__(self, addr, RequestHandlerClass, Type):
+        socketserver.UDPServer.__init__(self, addr, RequestHandlerClass)
+        self.Type = Type
+        self.size = sizeof(Type())
 
 class TCPClient(object):
     def __init__(self, addr, Type):

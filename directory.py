@@ -1,7 +1,6 @@
 from enum import Enum
 import protocol
 import ctypes as ct
-from pprint import pprint
 import logging
 from tabulate import tabulate
 import pickle
@@ -9,12 +8,12 @@ import os
 import hashlib
 
 class DirCode(Enum):
-    BYE = 0         # Client
-    LIST = 1        # Client
-    REGISTER = 2    # Client
-    QUERY = 3       # Client
+    BYE = 0         
+    LIST = 1        
+    REGISTER = 2    
+    QUERY = 3       
 
-PORT = 50819
+PORT = 40818
 PUB_IP = "127.0.0.1"
 
 # Add number of chunks
@@ -66,9 +65,13 @@ class DirServer(protocol.ThreadedTCPServer):
         self.file_lookup = file_lookup
         self.tracker_lookup = {}
         self.tracker_ip = tracker_ip
-        self.dir_port = 50819
+        self.dir_port = addr[1]
         for f in self.file_lookup.values():
             self.start_tracker(f.port)
+    def shutdown(self):
+        logging.debug("Stopping DirServer.")
+        logging.debug("[STUB]Stop Trackers")
+        protocol.ThreadedTCPServer.shutdown(self)
     def get_state(self):
         return self.file_lookup
     def start_tracker(self, port):

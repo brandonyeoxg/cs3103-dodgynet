@@ -6,6 +6,7 @@ import argparse
 import logging
 import commons
 import directory
+import puncher
 
 """
 DodgyNet is a peer to peer file file sharing program that implements the 
@@ -32,6 +33,8 @@ def main(arguments):
         type=str, default="e2empire.com")
     parser.add_argument('--debug', action='store_true', 
         help='Turns debug mode on.')
+    parser.add_argument('id', help="Id. for testing purposes", 
+        type=int)
             
     subparsers = parser.add_subparsers(dest="action", 
         help="Action to be performed, possible actions: %s. Type -h with the action provided to see manual about the action."
@@ -71,24 +74,35 @@ def main(arguments):
     else:
         logging.basicConfig(level=logging.INFO, format=commons.logger_consumer_format)
     logging.debug(args)
-
-    if args.action == "list":
+    action = args.action
+    if action == "list":
         logging.debug("Listing files from the server.")
         dir_client = directory.DirClient()
         dir_client.list()
         dir_client.bye()
-    elif args.action == "query":
+    elif action == "query":
         logging.debug("Query server and download dodgy file.")
         dir_client = directory.DirClient()
         dir_client.query(args.file, args.out)
         dir_client.bye()
-    elif args.action == "upload":
-        logging.debug("Uploading new file to server and start seeding.")
-        dir_client = directory.DirClient()
-        dir_client.register(args.file, args.description)
-        dir_client.bye()
+    elif action == "upload" or action == "seeder":
+        if action == "upload":
+            logging.debug("Uploading new file to server and start seeding.")
+            dir_client = directory.DirClient()
+            dir_client.register(args.file, args.description)
+            dir_client.bye()
+        
+        # Now start seeding
+        logging.debug("Start seeding.")
     else:
-        print("stub")
+        print("TEST-stubbed")
+        puncher_client = puncher.PuncherClient(args.id)
+        puncher_client.join()
+        target_id = int(input("Enter a target:"))
+        while target_id != 0:
+            puncher_client.connect(target_id)
+            target_id = int(input("Enter a target:"))
+        puncher_client.bye()
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
