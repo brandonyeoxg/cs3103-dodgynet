@@ -199,7 +199,7 @@ class PuncherClient(protocol.TCPClient):
         p = self.recv()
         if p.id != 0:
             logging.debug("Joined puncher network successfully, pub_ip=%s:%d" % p.get_addr())
-            self.listener_client = PuncherClient(self.id)
+            self.listener_client = PuncherClient(self.id, self.addr)
             listener_t = threading.Thread(target=self.listener_client.listen_forever)
             listener_t.daemon = True
             listener_t.start()
