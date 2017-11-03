@@ -24,13 +24,19 @@ doc_string = {
     'download': "Start downloading the file represented by the .dodgy file."
 }
 
+def valid_addr(s):
+    addr = s.split(':')
+    if len(addr) != 2:
+        msg = "Not valid ip address and port!"
+        raise argparse.ArgumentTypeError(msg)
+
 def main(arguments):
 
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('-s', '--server', help="Address of the server",
-        type=str, default="e2empire.com")
+        type=str, default="127.0.0.1")
     parser.add_argument('--debug', action='store_true', 
         help='Turns debug mode on.')
     parser.add_argument('id', help="Id. for testing purposes", 
@@ -77,18 +83,18 @@ def main(arguments):
     action = args.action
     if action == "list":
         logging.debug("Listing files from the server.")
-        dir_client = directory.DirClient()
+        dir_client = directory.DirClient((args.server, directory.PORT))
         dir_client.list()
         dir_client.bye()
     elif action == "query":
         logging.debug("Query server and download dodgy file.")
-        dir_client = directory.DirClient()
+        dir_client = directory.DirClient((args.server, directory.PORT))
         dir_client.query(args.file, args.out)
         dir_client.bye()
     elif action == "upload" or action == "seeder":
         if action == "upload":
             logging.debug("Uploading new file to server and start seeding.")
-            dir_client = directory.DirClient()
+            dir_client = directory.DirClient((args.server, directory.PORT))
             dir_client.register(args.file, args.description)
             dir_client.bye()
         
@@ -96,7 +102,7 @@ def main(arguments):
         logging.debug("Start seeding.")
     else:
         print("TEST-stubbed")
-        puncher_client = puncher.PuncherClient(args.id)
+        puncher_client = puncher.PuncherClient(args.id, (args.server, puncher.PORT))
         puncher_client.join()
         target_id = int(input("Enter a target:"))
         while target_id != 0:

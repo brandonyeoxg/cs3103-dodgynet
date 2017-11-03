@@ -6,6 +6,8 @@ import logging
 import socket
 import threading
 from queue import Queue
+from threading import Barrier
+from collections import defaultdict
 
 class PuncherCode(Enum):
     BYE = 0
@@ -37,10 +39,14 @@ class PuncherPacket(ct.Structure):
     
 class PuncherServer(protocol.ThreadedTCPServer):
     def __init__(self, pub_ip=PUB_IP, addr=('', PORT)):
-        logging.debug("Starting PuncherServer at port=%d" % addr[1])
+        logging.debug("Initialize PuncherServer at tcp_port=%d" % addr[1])
         protocol.ThreadedTCPServer.__init__(self, addr, PuncherHandler, PuncherPacket)
         self.conn_ids = []
-        self.conn_queues = {}
+        self.conn_queue_lookup = {}
+        self.conn_ids_rlookup = {}
+    def serve_forever(self):
+        logging.debug("Starting PuncherServer.")
+        protocol.ThreadedTCPServer.serve_forever(self)
     def shutdown(self):
         logging.debug("Stopping PuncherServer.")
         protocol.ThreadedTCPServer.shutdown(self)
@@ -49,61 +55,116 @@ class PuncherServer(protocol.ThreadedTCPServer):
     def nextadd_conn_id(self, node1, node2):
         conn_id = self.next_conn_id()
         logging.debug("Pairing %d<->%d, conn_id=%d" % (node1, node2, conn_id))
-        self.conn_ids.append((node1, node2))
+        conn = frozenset([node1, node2])
+        self.conn_ids.append(conn)
+        self.conn_ids_rlookup[conn] = conn_id
         return conn_id
 
-class PuncherConnectionServer(protocol.ThreadedUDPServer):
+class PuncherConnServer(protocol.UDPServer):
     def __init__(self, pub_ip=PUB_IP, addr=('', PORT)):
-        logging.debug("Starting PuncherDataServer at port=%d" % addr[1])
-        protocol.ThreadedUDPServer.__init__(self, addr, PuncherDataHandler, PuncherPacket)
-
+        logging.debug("Initialize PuncherConnServer at udp_port=%d" % addr[1])
+        protocol.UDPServer.__init__(self, addr, PuncherConnHandler, PuncherPacket)
+        self.pool_queue = {}
+    def serve_forever(self):
+        logging.debug("Starting PuncherConnServer.")
+        protocol.ThreadedTCPServer.serve_forever(self)
+    def shutdown(self):
+        logging.debug("Stopping PuncherConnServer.")
+        protocol.ThreadedTCPServer.shutdown(self)
+                
+class PuncherConnHandler(protocol.UDPHandler):
+    def setup(self):
+        logging.debug("Connected %s:%d" % self.client_address)
+    def handle(self):
+        pool_q = self.server.pool_queue
+        r = self.recv()
+        if r.id in pool_q:
+            print(self.request)
+            r.set_addr(pool_q[r.id])
+            self.send_back(r)
+            r.set_addr(self.client_address)
+            self.send(r, pool_q[r.id])
+        else:
+            pool_q[r.id] = self.client_address
+        
+        #pairings
+    def finish(self):
+        logging.debug("Disconnected %s:%d" % self.client_address)
+    
 class PuncherHandler(protocol.Handler):
     def setup(self):
         logging.debug("Connected %s:%d" % self.client_address)
     def handle(self):
+        q_lookup = self.server.conn_queue_lookup
+        conn_ids_rl = self.server.conn_ids_rlookup
         while True:
             r = self.recv()
             action = r.get_action()
             if action == PuncherCode.BYE:
                 logging.debug("Client says bye, we say bye back and quit!")
-                self.server.conn_queues[self.id].put(None)
+                q_lookup[self.id].put(None)
                 self.send(r)
                 break
             elif action == PuncherCode.JOIN:
                 logging.debug("Client[id=%s] wants to join the network." % 
                     r.id)
-                r.set_addr(self.client_address)
+                # check if he had joined before
+                if r.id in q_lookup:
+                    logging.fatal("Client[id=%s] already exists, STUB:REJOIN")
+                    r.id = 0
+                    self.send(r)
+                    continue
+                # new node, handle join and init the queue
                 self.id = r.id
+                q_lookup[r.id] = Queue()
                 self.send(r)
             elif action == PuncherCode.CONNECT:
                 logging.debug("Client[%s] wants to Client[%d]." % 
                     (self.id, r.id))
                 target_id = r.id
+                if target_id == self.id:
+                    logging.fatal("Why are you[id=%s] connecting to yourself?" % target_id)
+                    r.id = 0
+                    self.send(r)
+                    continue
+                conn = frozenset([self.id, r.id])
+                if conn in conn_ids_rl:
+                    logging.fatal("Why are you[id=%s] wasting connection, the node can be reached at conn_id=%s!" % (self.id, conn_ids_rl[conn]))
+                    r.id = 0
+                    self.send(r)
+                    continue
+                if not target_id in q_lookup or not self.id in q_lookup:
+                    if not target_id in q_lookup:
+                        logging.fatal("Target Client[id=%s] does not exist!")
+                    if not self.id in q_lookup:
+                        logging.fatal("My Client[id=%s] does not exist, did you forget to join the network?")
+                    r.id = 0
+                    self.send(r)
+                    continue
                 r.id = self.server.nextadd_conn_id(self.id, r.id)
                 # inform both to start UDP connection
-                self.server.conn_queues[target_id].put(r)
-                self.server.conn_queues[self.id].put(r)
+                q_lookup[target_id].put(r)
+                q_lookup[self.id].put(r)
                 self.send(r)
             elif action == PuncherCode.LISTEN:
                 # Create the queue to listen to, any one who want to initate 
                 # a connection with me will place it on the queue
-                q = Queue()
-                self.server.conn_queues[r.id] = q
+                q = q_lookup[r.id]
                 my_id = r.id
                 # Server becomes the sender
-                logging.debug("Server waiting for conn_id to send to: %d" % my_id)
+                logging.debug("Server waiting for connections to: %d" % my_id)
                 while True:
                     # Note, item is not mutable
                     item = q.get()
                     if item == None:
                         break
-                    print(item)
                     logging.debug("Send connection request conn_id=%d to id=%d" % (item.id, my_id))
                     self.send(item)
                 # get from Q and push connection request
                 r.set_action(PuncherCode.BYE)
                 self.send(r)
                 logging.debug("Server closed listener on %d" % r.id)
+                del q_lookup[r.id]
                 break
             else:
                 logging.debug("STUB, Unknown packet: %s" % r)
@@ -114,9 +175,9 @@ class PuncherHandler(protocol.Handler):
 # Client will serve forever. This is a special case where client is a server as
 # well.
 class PuncherClient(protocol.TCPClient):
-    def __init__(self, _id):
+    def __init__(self, _id, server_addr=(PUB_IP, PORT)):
         logging.debug("Starting PuncherClient id=%d", _id)
-        protocol.TCPClient.__init__(self, (PUB_IP, PORT), PuncherPacket)
+        protocol.TCPClient.__init__(self, server_addr, PuncherPacket)
         self.id  = _id
         self.my_addr = self.socket.getsockname()
     def bye(self):
@@ -150,6 +211,10 @@ class PuncherClient(protocol.TCPClient):
         p.set_action(PuncherCode.CONNECT)
         self.send(p)
         p = self.recv()
+        if p.id == 0:
+            logging.fatal("Failed to connect to id=%d" % target_id)
+        else:
+            logging.debug("Successfully sent request to connect, waiting for punch request.")
     def listen_forever(self):
         logging.debug("Listening for conn_id to connect to!")
         p = PuncherPacket()
@@ -159,9 +224,22 @@ class PuncherClient(protocol.TCPClient):
         p = self.recv()
         while p.get_action() != PuncherCode.BYE:
             # Do something
-            logging.debug("Recieved new request, connecting to server to punch with conn_id=%d" % p.id)
+            logging.debug("Recieved new punch request, connecting to server to punch with conn_id=%d" % p.id)
             logging.debug(p)
+            client = PuncherConnClient(p, self.id, self.addr)
             p = self.recv()
         logging.debug("Server terminated the listen.")
 
+class PuncherConnClient(protocol.UDPClient):
+    def __init__(self, r, _id, server_addr=(PUB_IP, PORT)):
+        logging.debug("Starting PuncherConnClient conn_id=%d by id=%d" % (r.id, _id))
+        protocol.UDPClient.__init__(self, server_addr, PuncherPacket)
+        self.send(r)
+        r = self.recv()
+        logging.debug(r)
+        self.set_type(r.get_addr(), PuncherPacket)
+        r.id = 1234 + _id
+        self.send(r)
+        self.send(r)
+        print(self.recv())
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=80:

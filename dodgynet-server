@@ -41,18 +41,24 @@ class Server(object):
             d = {}
             self.dir_server = directory.DirServer(d)
         self.puncher_server = puncher.PuncherServer()
+        self.puncher_conn_server = puncher.PuncherConnServer()
     def serve_forever(self):
-        puncher_t = threading.Thread(target=self.puncher_server.serve_forever)
-        puncher_t.daemon = True
-        puncher_t.start()
+        Server.start_server(self.puncher_server)
+        Server.start_server(self.puncher_conn_server)
         self.dir_server.serve_forever()
     def shutdown(self):
         self.puncher_server.shutdown()
+        self.puncher_conn_server.shutdown()
         self.dir_server.shutdown()
     def save_state(self):
         state = {}
         state['dir'] = self.dir_server.get_state()
         pickle.dump(state, open(self.state_file, "wb"))
+    @classmethod
+    def start_server(cls, server):
+        puncher_t = threading.Thread(target=server.serve_forever)
+        puncher_t.daemon = True
+        puncher_t.start()
 
 possible_servers = ["all", "directory", "tracker", "puncher"]
 

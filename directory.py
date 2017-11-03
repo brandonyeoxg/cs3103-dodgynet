@@ -83,9 +83,9 @@ class DirServer(protocol.ThreadedTCPServer):
 class DirClient(protocol.TCPClient):
     headers = ["#", "File Name", "Description", "#Peers", 
                 "Tracker Address", "MD5", "Size"]
-    def __init__(self):
+    def __init__(self, server_addr=(PUB_IP, PORT)):
         logging.debug("Starting DirClient.")
-        protocol.TCPClient.__init__(self, (PUB_IP, PORT), DirPacket)
+        protocol.TCPClient.__init__(self, server_addr, DirPacket)
     def bye(self):
         logging.debug("Initiate shutdown.")
         p = DirPacket()

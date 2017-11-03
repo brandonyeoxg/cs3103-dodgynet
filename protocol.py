@@ -44,8 +44,7 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
         self.Type = Type
         self.size = sizeof(Type())
         
-class ThreadedUDPServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
-    daemon_threads = True
+class UDPServer(socketserver.UDPServer):
     allow_reuse_address = True
     def __init__(self, addr, RequestHandlerClass, Type):
         socketserver.UDPServer.__init__(self, addr, RequestHandlerClass)
@@ -55,6 +54,7 @@ class ThreadedUDPServer(socketserver.ThreadingMixIn, socketserver.UDPServer):
 class TCPClient(object):
     def __init__(self, addr, Type):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.addr = addr
         self.socket.connect(addr)
         self.size = sizeof(Type())
         self.Type = Type
@@ -64,6 +64,26 @@ class TCPClient(object):
         self.socket.sendall(bin_arr)
     def recv(self):
         bin_arr = self.socket.recv(self.size)
+        logging.debug("Client recv: %s" % debug_hex(bin_arr))
+        return unpack(bin_arr, self.Type)
+    def close(self):
+        logging.debug("Closing socket.")
+        self.socket.close()
+
+class UDPClient(object):
+    def __init__(self, addr, Type):
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.set_type(addr, Type)
+    def set_type(self, addr, Type):
+        self.addr = addr
+        self.size = sizeof(Type())
+        self.Type = Type
+    def send(self, obj):
+        bin_arr = pack(obj)
+        logging.debug("Client sent: %s" % debug_hex(bytearray(bin_arr)))
+        self.socket.sendto(bin_arr, self.addr)
+    def recv(self):
+        bin_arr, addr = self.socket.recvfrom(self.size)
         logging.debug("Client recv: %s" % debug_hex(bin_arr))
         return unpack(bin_arr, self.Type)
     def close(self):
@@ -83,6 +103,18 @@ class Handler(socketserver.BaseRequestHandler):
         self.request.sendall(bin_arr)
     def recv(self):
         bin_arr = self.request.recv(self.server.size)
+        logging.debug("Server recv: %s" % debug_hex(bin_arr))
+        return unpack(bin_arr, self.server.Type)
+        
+class UDPHandler(socketserver.BaseRequestHandler):
+    def send_back(self, obj):
+        self.send(obj, self.client_address)
+    def send(self, obj, addr):
+        bin_arr = pack(obj)
+        logging.debug("Server sent to %s: %s" % ("%s:%d"%addr, debug_hex(bytearray(bin_arr))))
+        self.request[1].sendto(bin_arr, addr)
+    def recv(self):
+        bin_arr = self.request[0]
         logging.debug("Server recv: %s" % debug_hex(bin_arr))
         return unpack(bin_arr, self.server.Type)
 
