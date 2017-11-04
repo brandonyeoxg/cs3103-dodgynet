@@ -102,7 +102,7 @@ def main(arguments):
         logging.debug("Start seeding.")
     else:
         print("TEST-stubbed")
-        puncher_client = puncher.PuncherClient(args.id, puncher.PuncherPacket, (args.server, puncher.PORT))
+        puncher_client = puncher.PuncherClient(args.id, puncher.PuncherConnClient, (args.server, puncher.PORT))
         puncher_client.join()
         target_id = int(input("Enter a target:"))
         while target_id != 0:
