@@ -100,18 +100,25 @@ def main(arguments):
         
         # Now start seeding
         logging.debug("Start seeding.")
+    elif action == "download":
+        logging.debug("Download the specified file at %s" % args.dodgy_file)
     else:
+        logging.debug("For testing purposes!")
+
         print("TEST-stubbed")
         puncher_client = puncher.PuncherClient(args.id, puncher.PuncherConnClient, (args.server, puncher.PORT))
         puncher_client.join()
         target_id = int(input("Enter a target:"))
         while target_id != 0:
             c = puncher_client.connect_cached(target_id)
-            c.send(puncher.PuncherPacket())
-            print(c.recv())
+            if c == None:
+                logging.fatal("Cannot connect to id=%d", target_id)
+            else:
+                c.send(puncher.PuncherPacket())
+                print(c.recv())
             target_id = int(input("Enter a target:"))
         puncher_client.bye()
-
+''''''
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
 

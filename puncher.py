@@ -41,9 +41,9 @@ class PuncherServer(protocol.ThreadedTCPServer):
     def __init__(self, pub_ip=PUB_IP, addr=('', PORT)):
         logging.debug("Initialize PuncherServer at tcp_port=%d" % addr[1])
         protocol.ThreadedTCPServer.__init__(self, addr, PuncherHandler, PuncherPacket)
-        self.conn_ids = []
         self.conn_queue_lookup = {}
         self.conn_ids_rlookup = {}
+        self.conn_ids_target_lookup = defaultdict(list)
     def serve_forever(self):
         logging.debug("Starting PuncherServer.")
         protocol.ThreadedTCPServer.serve_forever(self)
@@ -51,13 +51,13 @@ class PuncherServer(protocol.ThreadedTCPServer):
         logging.debug("Stopping PuncherServer.")
         protocol.ThreadedTCPServer.shutdown(self)
     def next_conn_id(self):
-        return len(self.conn_ids) + 1
-    def nextadd_conn_id(self, node1, node2):
+        return len(self.conn_ids_rlookup) + 1
+    def nextadd_conn_id(self, _id, target_id):
         conn_id = self.next_conn_id()
-        logging.debug("Pairing %d-->%d, conn_id=%d" % (node1, node2, conn_id))
-        conn = (node1, node2)
-        self.conn_ids.append(conn)
+        logging.debug("Pairing %d-->%d, conn_id=%d" % (_id, target_id, conn_id))
+        conn = (_id, target_id)
         self.conn_ids_rlookup[conn] = conn_id
+        self.conn_ids_target_lookup[target_id].append(conn)
         return conn_id
 
 class PuncherConnServer(protocol.UDPServer):
@@ -83,17 +83,18 @@ class PuncherConnHandler(protocol.UDPHandler):
             self.send_back(r)
             r.set_addr(self.client_address)
             self.send(r, pool_q[r.id])
+            del pool_q[r.id]
         else:
             logging.debug("The other client has yet to arrive with conn_id=%d" % r.id)
             pool_q[r.id] = self.client_address
 
-    
 class PuncherHandler(protocol.Handler):
     def setup(self):
         logging.debug("Connected %s:%d" % self.client_address)
     def handle(self):
         q_lookup = self.server.conn_queue_lookup
         conn_ids_rl = self.server.conn_ids_rlookup
+        conn_ids_tl = self.server.conn_ids_target_lookup
         while True:
             r = self.recv()
             action = r.get_action()
@@ -162,6 +163,10 @@ class PuncherHandler(protocol.Handler):
                 self.send(r)
                 logging.debug("Server closed listener on %d" % r.id)
                 del q_lookup[r.id]
+                for conn in conn_ids_tl[r.id]:
+                    del conn_ids_rl[conn]
+                if r.id in conn_ids_tl:
+                    del conn_ids_tl[r.id]
                 break
             else:
                 logging.debug("STUB, Unknown packet: %s" % r)
@@ -211,7 +216,7 @@ class PuncherClient(protocol.TCPClient):
         else:
             logging.debug("Not connected before, starting new connection.")
             client = self.connect(target_id)
-            if client.is_punched:
+            if client != None and client.is_punched:
                 logging.debug("Punch successful, storing to cache")
                 self.cached_conns[target_id] = client
                 return client
@@ -289,17 +294,18 @@ class PuncherConnClient(protocol.UDPClient):
             logging.fatal("Failed to punch, stop trying...")
 
         # Flush is necessary to get rid of all the junk stuck in buffer before the punch.
-        self.flush()
+        #self.flush()
+        self.recv()
         self.socket.settimeout(None)
         self.n_incoming = 0
     def flush(self):
         self.socket.settimeout(0.1)
         while True:
-            logging.debug("Flushing...")
             try:
-                d = self.socket.recv(1024)
+                p_flush = self.recv()
+                logging.debug("Flushing: %s" % p_flush)
             except:
-                logging.debug("Flushed!")
+                logging.debug("Flushed successfully!")
                 break;
     def handle_incoming_forever(self):
         while True:
