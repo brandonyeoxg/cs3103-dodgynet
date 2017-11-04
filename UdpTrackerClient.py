@@ -1,5 +1,7 @@
 from builtins import dict
 from random import randint
+from enum import Enum
+import ctypes as ct
 import socket
 import struct
 import time
@@ -16,10 +18,10 @@ class TrackerCode(Enum):
 class TrackerPacket(ct.Structure):
     _fields_ = [("connection_id", ct.c_ubyte * 8),
                 ("action", ct.c_ubyte * 4),
-                ("transaction_id", ct.c_ubyte * 4),
-                ("peer_id", ct.c_ubyte * 4),
+                ("transaction_id", ct.c_uint),
+                ("peer_id", ct.c_uint),
                 ("ip", ct.c_ubyte * 4), # Represents in [Announce Request: Client IPv4] [Want Request: Client IPv4] [Want Response: Peer A IPv4]
-                ("id", ct.c_ubyte * 4), # Represents in [Announce Request: Num Chunk Have] [Want Request: Num Chunk Want] [Want Response: Peer A peer id]
+                ("id", ct.c_uint), # Represents in [Announce Request: Num Chunk Have] [Want Request: Num Chunk Want] [Want Response: Peer A peer id]
     def set_action(self, action):
         self.action = action.value
     def get_action(self):
