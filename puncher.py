@@ -223,10 +223,14 @@ class PuncherClient(protocol.TCPClient):
         self.send(p)
         p = self.recv()
         while p.get_action() != PuncherCode.BYE:
-            # Do something
-            logging.debug("Recieved new punch request, connecting to server to punch with conn_id=%d" % p.id)
-            logging.debug(p)
+            logging.debug("Recieved new punch request with conn_id=%d" % p.id)
+
             client = PuncherConnClient(p, self.id, self.addr)
+            # We spawn a new thread handling the request
+            if not client.is_punched:
+                return
+            logging.debug("Now we spawn thread to handle incoming from client.")
+            
             p = self.recv()
         logging.debug("Server terminated the listen.")
 
@@ -237,7 +241,7 @@ class PuncherConnClient(protocol.UDPClient):
         self.send(r)
         r = self.recv()
         if r.id == 0:
-            logging.fatal("Error, UDP cannot hook us up! :(")
+            logging.fatal("Error Puncher failed to hook us up.")
         
         # Now we set the return address to the other client
         self.set_type(r.get_addr(), PuncherPacket)
@@ -257,13 +261,14 @@ class PuncherConnClient(protocol.UDPClient):
             try:
                 r = self.recv()
                 is_punched = True
-                logging.debug("Successful punch to id=%d" % r.id)
+                self.target_id = r.id
+                logging.debug("Successful punch to id=%d at %s" % (r.id, "%s:%d"%self.client_address))
                 break
-            except timeout:
-                logging.debug("Timeout, did not recieve the packet.")
+            except socket.timeout:
+                logging.debug("Timeout, did not recieve the packet, retrying...")
         self.socket.settimeout(None)
         self.is_punched = is_punched
-    def get_is_punched(self):
-        return self.is_punched
+        if not is_punched:
+            logging.fatal("Failed to punch, stop trying...")
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=80:
