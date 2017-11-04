@@ -54,8 +54,8 @@ class PuncherServer(protocol.ThreadedTCPServer):
         return len(self.conn_ids) + 1
     def nextadd_conn_id(self, node1, node2):
         conn_id = self.next_conn_id()
-        logging.debug("Pairing %d<->%d, conn_id=%d" % (node1, node2, conn_id))
-        conn = frozenset([node1, node2])
+        logging.debug("Pairing %d-->%d, conn_id=%d" % (node1, node2, conn_id))
+        conn = (node1, node2)
         self.conn_ids.append(conn)
         self.conn_ids_rlookup[conn] = conn_id
         return conn_id
@@ -73,23 +73,20 @@ class PuncherConnServer(protocol.UDPServer):
         protocol.ThreadedTCPServer.shutdown(self)
                 
 class PuncherConnHandler(protocol.UDPHandler):
-    def setup(self):
-        logging.debug("Connected %s:%d" % self.client_address)
     def handle(self):
         pool_q = self.server.pool_queue
         r = self.recv()
+        logging.debug("Request from %s: conn_id=%d" % ("%s:%d"%self.client_address, r.id))
         if r.id in pool_q:
-            print(self.request)
+            logging.debug("Both clients are here with conn_id=%d" % r.id)
             r.set_addr(pool_q[r.id])
             self.send_back(r)
             r.set_addr(self.client_address)
             self.send(r, pool_q[r.id])
         else:
+            logging.debug("The other client has yet to arrive with conn_id=%d" % r.id)
             pool_q[r.id] = self.client_address
-        
-        #pairings
-    def finish(self):
-        logging.debug("Disconnected %s:%d" % self.client_address)
+
     
 class PuncherHandler(protocol.Handler):
     def setup(self):
@@ -127,7 +124,7 @@ class PuncherHandler(protocol.Handler):
                     r.id = 0
                     self.send(r)
                     continue
-                conn = frozenset([self.id, r.id])
+                conn = (self.id, r.id)
                 if conn in conn_ids_rl:
                     logging.fatal("Why are you[id=%s] wasting connection, the node can be reached at conn_id=%s!" % (self.id, conn_ids_rl[conn]))
                     r.id = 0
@@ -142,9 +139,9 @@ class PuncherHandler(protocol.Handler):
                     self.send(r)
                     continue
                 r.id = self.server.nextadd_conn_id(self.id, r.id)
-                # inform both to start UDP connection
+                # inform target to start UDP connection
                 q_lookup[target_id].put(r)
-                q_lookup[self.id].put(r)
+                # we tell the remote client to setup the UDP
                 self.send(r)
             elif action == PuncherCode.LISTEN:
                 # Create the queue to listen to, any one who want to initate 
@@ -213,8 +210,11 @@ class PuncherClient(protocol.TCPClient):
         p = self.recv()
         if p.id == 0:
             logging.fatal("Failed to connect to id=%d" % target_id)
+            return None
         else:
-            logging.debug("Successfully sent request to connect, waiting for punch request.")
+            logging.debug("Successfully sent request to connect, connect to conn_id=%d" % p.id)
+            client = PuncherConnClient(p, self.id, self.addr)
+            return client
     def listen_forever(self):
         logging.debug("Listening for conn_id to connect to!")
         p = PuncherPacket()
@@ -236,9 +236,13 @@ class PuncherConnClient(protocol.UDPClient):
         protocol.UDPClient.__init__(self, server_addr, PuncherPacket)
         self.send(r)
         r = self.recv()
-        logging.debug(r)
+        if r.id == 0:
+            logging.fatal("Error, UDP cannot hook us up! :(")
+        
+        # Now we set the return address to the other client
         self.set_type(r.get_addr(), PuncherPacket)
-        r.id = 1234 + _id
+        
+        r.id = _id
         self.send(r)
         self.send(r)
         print(self.recv())
