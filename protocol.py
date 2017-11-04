@@ -84,7 +84,6 @@ class UDPClient(object):
         self.socket.sendto(bin_arr, self.addr)
     def recv(self):
         bin_arr, addr = self.socket.recvfrom(self.size)
-        self.client_address = addr
         logging.debug("Client recv: %s" % debug_hex(bin_arr))
         return unpack(bin_arr, self.Type)
     def close(self):

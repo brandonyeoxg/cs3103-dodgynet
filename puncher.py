@@ -172,11 +172,13 @@ class PuncherHandler(protocol.Handler):
 # Client will serve forever. This is a special case where client is a server as
 # well.
 class PuncherClient(protocol.TCPClient):
-    def __init__(self, _id, server_addr=(PUB_IP, PORT)):
+    def __init__(self, _id, EndpointPacket, server_addr=(PUB_IP, PORT)):
         logging.debug("Starting PuncherClient id=%d", _id)
         protocol.TCPClient.__init__(self, server_addr, PuncherPacket)
         self.id  = _id
+        self.EndpointPacket = EndpointPacket
         self.my_addr = self.socket.getsockname()
+        self.cached_conns = {}
     def bye(self):
         logging.debug("Initiate shutdown.")
         p = PuncherPacket()
@@ -196,12 +198,25 @@ class PuncherClient(protocol.TCPClient):
         p = self.recv()
         if p.id != 0:
             logging.debug("Joined puncher network successfully, pub_ip=%s:%d" % p.get_addr())
-            self.listener_client = PuncherClient(self.id, self.addr)
+            self.listener_client = PuncherClient(self.id, self.EndpointPacket, self.addr)
             listener_t = threading.Thread(target=self.listener_client.listen_forever)
             listener_t.daemon = True
             listener_t.start()
         else:
             logging.fatal("Failed to join puncher network.")
+    def connect_cached(self, target_id):
+        if target_id in self.cached_conns:
+            logging.debug("Previously connected, returning from cache.")
+            return self.cached_conns[target_id]
+        else:
+            logging.debug("Not connected before, starting new connection.")
+            client = self.connect(target_id)
+            if client.is_punched:
+                logging.debug("Punch successful, storing to cache")
+                self.cached_conns[target_id] = client
+                return client
+            else:
+                logging.fatal("Punch not successful. STUB: Turn?")
     def connect(self, target_id):
         p = PuncherPacket()
         p.id = target_id
@@ -213,7 +228,7 @@ class PuncherClient(protocol.TCPClient):
             return None
         else:
             logging.debug("Successfully sent request to connect, connect to conn_id=%d" % p.id)
-            client = PuncherConnClient(p, self.id, self.addr)
+            client = PuncherConnClient(p, self.id, self.EndpointPacket, self.addr)
             return client
     def listen_forever(self):
         logging.debug("Listening for conn_id to connect to!")
@@ -225,17 +240,19 @@ class PuncherClient(protocol.TCPClient):
         while p.get_action() != PuncherCode.BYE:
             logging.debug("Recieved new punch request with conn_id=%d" % p.id)
 
-            client = PuncherConnClient(p, self.id, self.addr)
+            client = PuncherConnClient(p, self.id, self.EndpointPacket, self.addr)
             # We spawn a new thread handling the request
             if not client.is_punched:
                 return
             logging.debug("Now we spawn thread to handle incoming from client.")
-            
+            client_t = threading.Thread(target=server.handle_incoming_forever)
+            client_t.daemon = True
+            client_t.start()
             p = self.recv()
         logging.debug("Server terminated the listen.")
 
 class PuncherConnClient(protocol.UDPClient):
-    def __init__(self, r, _id, server_addr=(PUB_IP, PORT)):
+    def __init__(self, r, _id, EndpointPacket, server_addr=(PUB_IP, PORT)):
         logging.debug("Starting PuncherConnClient conn_id=%d by id=%d" % (r.id, _id))
         protocol.UDPClient.__init__(self, server_addr, PuncherPacket)
         self.send(r)
@@ -262,13 +279,26 @@ class PuncherConnClient(protocol.UDPClient):
                 r = self.recv()
                 is_punched = True
                 self.target_id = r.id
-                logging.debug("Successful punch to id=%d at %s" % (r.id, "%s:%d"%self.client_address))
+                logging.debug("Successful punch to id=%d at %s" % (r.id, "%s:%d"%self.addr))
                 break
             except socket.timeout:
                 logging.debug("Timeout, did not recieve the packet, retrying...")
-        self.socket.settimeout(None)
         self.is_punched = is_punched
         if not is_punched:
             logging.fatal("Failed to punch, stop trying...")
+        self.set_type(self.addr, EndpointPacket)
+    def handle_incoming_forever(self):
+        while True:
+            try:
+                # forever handle incoming requests and push the requests to queue
+                p = self.recv()
+                logging.debug("Endpoint incoming: %s" % str(p))
+                self.send(self.incoming_endpoint(p))
+                logging.debug("Endpoint outgoing: %s" % str(p))
+            except socket.timeout:
+                logging.fatal("Packet dropped.")
+    def incoming_endpoint(self, p):
+        logging.fatal("Fake endpoint, STUB, echo packets.")
+        return p
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=80:
