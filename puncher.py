@@ -242,8 +242,14 @@ class PuncherConnClient(protocol.UDPClient):
         # Now we set the return address to the other client
         self.set_type(r.get_addr(), PuncherPacket)
         
+        # Now we perform the punch
+        # If successful, the message will send the id of myself, then we will 
+        # be able to identify which connection this is to.
         r.id = _id
+        # In theory, this is the punching message
         self.send(r)
+        while 
+        
         self.send(r)
         print(self.recv())
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=80:
