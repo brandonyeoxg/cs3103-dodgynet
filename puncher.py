@@ -245,7 +245,7 @@ class PuncherClient(protocol.TCPClient):
             if not client.is_punched:
                 return
             logging.debug("Now we spawn thread to handle incoming from client.")
-            client_t = threading.Thread(target=server.handle_incoming_forever)
+            client_t = threading.Thread(target=client.handle_incoming_forever)
             client_t.daemon = True
             client_t.start()
             p = self.recv()
