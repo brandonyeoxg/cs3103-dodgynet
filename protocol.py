@@ -80,11 +80,11 @@ class UDPClient(object):
         self.Type = Type
     def send(self, obj):
         bin_arr = pack(obj)
-        logging.debug("Client sent: %s" % debug_hex(bytearray(bin_arr)))
+        logging.debug("Client sent: %s to %s" % (debug_hex(bytearray(bin_arr)), "%s:%d"%self.addr) )
         self.socket.sendto(bin_arr, self.addr)
     def recv(self):
         bin_arr, addr = self.socket.recvfrom(self.size)
-        logging.debug("Client recv: %s" % debug_hex(bin_arr))
+        logging.debug("Client recv: %s from %s" % (debug_hex(bin_arr), "%s:%d"%addr))
         return unpack(bin_arr, self.Type)
     def close(self):
         logging.debug("Closing socket.")

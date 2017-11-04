@@ -283,20 +283,32 @@ class PuncherConnClient(protocol.UDPClient):
                 break
             except socket.timeout:
                 logging.debug("Timeout, did not recieve the packet, retrying...")
+        self.flush()
         self.is_punched = is_punched
         self.socket.settimeout(None)
         if not is_punched:
             logging.fatal("Failed to punch, stop trying...")
         self.set_type(self.addr, EndpointPacket)
+        self.n_incoming = 0
+    def flush(self):
+        self.socket.settimeout(1)
+        while True:
+            try:
+                d = self.socket.recv(1024)
+            except:
+                break;
+        self.socket.settimeout(None)
     def handle_incoming_forever(self):
         while True:
             # forever handle incoming requests and push the requests to queue
             p = self.recv()
             logging.debug("Endpoint incoming: %s" % str(p))
             self.send(self.incoming_endpoint(p))
+            self.n_incoming += 1
             logging.debug("Endpoint outgoing: %s" % str(p))
     def incoming_endpoint(self, p):
         logging.fatal("Fake endpoint, STUB, echo packets.")
+        p.id = self.n_incoming
         return p
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=80:
