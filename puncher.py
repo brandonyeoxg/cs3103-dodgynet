@@ -284,19 +284,17 @@ class PuncherConnClient(protocol.UDPClient):
             except socket.timeout:
                 logging.debug("Timeout, did not recieve the packet, retrying...")
         self.is_punched = is_punched
+        self.socket.settimeout(None)
         if not is_punched:
             logging.fatal("Failed to punch, stop trying...")
         self.set_type(self.addr, EndpointPacket)
     def handle_incoming_forever(self):
         while True:
-            try:
-                # forever handle incoming requests and push the requests to queue
-                p = self.recv()
-                logging.debug("Endpoint incoming: %s" % str(p))
-                self.send(self.incoming_endpoint(p))
-                logging.debug("Endpoint outgoing: %s" % str(p))
-            except socket.timeout:
-                logging.fatal("Packet dropped.")
+            # forever handle incoming requests and push the requests to queue
+            p = self.recv()
+            logging.debug("Endpoint incoming: %s" % str(p))
+            self.send(self.incoming_endpoint(p))
+            logging.debug("Endpoint outgoing: %s" % str(p))
     def incoming_endpoint(self, p):
         logging.fatal("Fake endpoint, STUB, echo packets.")
         return p

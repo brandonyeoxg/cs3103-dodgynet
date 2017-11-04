@@ -108,7 +108,7 @@ def main(arguments):
         while target_id != 0:
             c = puncher_client.connect_cached(target_id)
             c.send(puncher.PuncherPacket())
-            c.recv()
+            print(c.recv())
             target_id = int(input("Enter a target:"))
         puncher_client.bye()
 
