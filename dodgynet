@@ -123,7 +123,13 @@ def main(arguments):
         tracker_client = tracker.TrackerClient()
         _id = tracker_client.join()
         logging.info("Joined with id=%d" % _id)
-        input("Enter a target:")
+        chunk_id = int(input("Enter a chunk[announce]:"))
+        while chunk_id != 0:
+            tracker_client.announce(chunk_id)
+            chunk_id = int(input("Enter a chunk[want]:"))
+            peer_l = tracker_client.want(chunk_id)
+            print(peer_l)
+            chunk_id = int(input("Enter a chunk[announce]:"))
         tracker_client.bye()
 ''''''
 if __name__ == '__main__':
