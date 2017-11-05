@@ -8,6 +8,8 @@ import commons
 import directory
 import puncher
 import tracker
+import pickle
+import p2p
 
 """
 DodgyNet is a peer to peer file file sharing program that implements the 
@@ -40,8 +42,8 @@ def main(arguments):
         type=str, default="127.0.0.1")
     parser.add_argument('--debug', action='store_true', 
         help='Turns debug mode on.')
-    parser.add_argument('id', help="Id. for testing purposes", 
-        type=int)
+    #parser.add_argument('id', help="Id. for testing purposes", 
+    #    type=int)
             
     subparsers = parser.add_subparsers(dest="action", 
         help="Action to be performed, possible actions: %s. Type -h with the action provided to see manual about the action."
@@ -92,15 +94,26 @@ def main(arguments):
         dir_client = directory.DirClient((args.server, directory.PORT))
         dir_client.query(args.file, args.out)
         dir_client.bye()
-    elif action == "upload" or action == "seeder":
+    elif action == "upload" or action == "seed":
+        dodgy_p = None
         if action == "upload":
             logging.debug("Uploading new file to server and start seeding.")
             dir_client = directory.DirClient((args.server, directory.PORT))
-            dir_client.register(args.file, args.description)
+            dodgy_p = dir_client.register(args.file, args.description)
             dir_client.bye()
-        
+        if action == "seed":
+            dodgy_p = pickle.load(args.dodgy_file)
+
         # Now start seeding
         logging.debug("Start seeding.")
+        tracker_client = tracker.TrackerClient(dodgy_p.get_addr())
+        my_id = tracker_client.join()
+        logging.info("Client joined with id=%d" % my_id)
+        # Now we start the puncher
+        puncher_client = puncher.PuncherClient(my_id, p2p.P2pEndpointClient, 
+            (args.server, puncher.PORT))
+        puncher_client.join()
+        
     elif action == "download":
         logging.debug("Download the specified file at %s" % args.dodgy_file)
     else:
@@ -120,7 +133,7 @@ def main(arguments):
             target_id = int(input("Enter a target:"))
         puncher_client.bye()
         '''
-        tracker_client = tracker.TrackerClient()
+        tracker_client = tracker.TrackerClient(('127.0.0.1', 50147))
         _id = tracker_client.join()
         logging.info("Joined with id=%d" % _id)
         chunk_id = int(input("Enter a chunk[announce]:"))

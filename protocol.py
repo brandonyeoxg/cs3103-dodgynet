@@ -3,6 +3,7 @@ import socket
 import socketserver
 import re
 import logging
+import threading
 
 def pack(obj):
     buf = string_at(byref(obj), sizeof(obj))
@@ -43,6 +44,10 @@ class ThreadedTCPServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
         socketserver.TCPServer.__init__(self, addr, RequestHandlerClass)
         self.Type = Type
         self.size = sizeof(Type())
+    def serve_forever_nb(self):
+        th = threading.Thread(target=self.serve_forever)
+        th.daemon = True
+        th.start()
         
 class UDPServer(socketserver.UDPServer):
     allow_reuse_address = True
@@ -50,6 +55,10 @@ class UDPServer(socketserver.UDPServer):
         socketserver.UDPServer.__init__(self, addr, RequestHandlerClass)
         self.Type = Type
         self.size = sizeof(Type())
+    def serve_forever_nb(self):
+        th = threading.Thread(target=self.serve_forever)
+        th.daemon = True
+        th.start()
 
 class TCPClient(object):
     def __init__(self, addr, Type):

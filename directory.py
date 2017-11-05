@@ -5,7 +5,8 @@ import logging
 from tabulate import tabulate
 import pickle
 import os
-import hashlib
+import tracker
+import commons
 
 class DirCode(Enum):
     BYE = 0         
@@ -76,7 +77,9 @@ class DirServer(protocol.ThreadedTCPServer):
         return self.file_lookup
     def start_tracker(self, port):
         logging.debug("[STUB]Create new Tracker at port=%d" % port)
-        self.tracker_lookup[port] = []
+        tracker_server = tracker.TrackerServer((self.tracker_ip, port))
+        tracker_server.serve_forever_nb()
+        self.tracker_lookup[port] = tracker_server
     def next_port(self):
         return len(self.tracker_lookup) + self.dir_port + 1
 
@@ -133,23 +136,16 @@ class DirClient(protocol.TCPClient):
         p.set_action(DirCode.REGISTER)
         p.set_name(os.path.basename(file_upload.name))
         p.set_desc(description)
-        p.set_md5(self.md5sum(file_upload))
+        p.set_md5(commons.md5sum(file_upload))
         p.file_size = self.get_size(file_upload)
         self.send(p)
         p = self.recv()
         if p.id != 0:
             logging.info("Registration of %s successful!" % p.get_name())
+            return p
         else:
             logging.info("Registration %s not successful, file with name exist!" 
                 % p.get_name())
-    def md5sum(self, fd):
-        md5 = hashlib.md5()
-        length = md5.block_size * 128
-        for chunk in iter(lambda: fd.read(length), b''):
-            md5.update(chunk)
-        digest = md5.digest()
-        logging.debug("Digest: %s" % md5.hexdigest())
-        return digest
     def get_size(self, fd):
         return os.path.getsize(os.path.realpath(fd.name))
 
