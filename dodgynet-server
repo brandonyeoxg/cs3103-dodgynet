@@ -7,6 +7,7 @@ import argparse
 import logging
 import directory
 import puncher
+import tracker
 import commons
 import pickle
 import logging
@@ -42,13 +43,16 @@ class Server(object):
             self.dir_server = directory.DirServer(d)
         self.puncher_server = puncher.PuncherServer()
         self.puncher_conn_server = puncher.PuncherConnServer()
+        self.tracker_server = tracker.TrackerServer()
     def serve_forever(self):
         Server.start_server(self.puncher_server)
         Server.start_server(self.puncher_conn_server)
+        Server.start_server(self.tracker_server)
         self.dir_server.serve_forever()
     def shutdown(self):
         self.puncher_server.shutdown()
         self.puncher_conn_server.shutdown()
+        self.tracker_server.shutdown()
         self.dir_server.shutdown()
     def save_state(self):
         state = {}

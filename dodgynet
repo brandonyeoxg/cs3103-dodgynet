@@ -7,6 +7,7 @@ import logging
 import commons
 import directory
 import puncher
+import tracker
 
 """
 DodgyNet is a peer to peer file file sharing program that implements the 
@@ -104,7 +105,7 @@ def main(arguments):
         logging.debug("Download the specified file at %s" % args.dodgy_file)
     else:
         logging.debug("For testing purposes!")
-
+        '''
         print("TEST-stubbed")
         puncher_client = puncher.PuncherClient(args.id, puncher.PuncherConnClient, (args.server, puncher.PORT))
         puncher_client.join()
@@ -118,6 +119,12 @@ def main(arguments):
                 print(c.recv())
             target_id = int(input("Enter a target:"))
         puncher_client.bye()
+        '''
+        tracker_client = tracker.TrackerClient()
+        _id = tracker_client.join()
+        logging.info("Joined with id=%d" % _id)
+        input("Enter a target:")
+        tracker_client.bye()
 ''''''
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
