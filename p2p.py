@@ -66,6 +66,7 @@ class P2pEndpointClient(puncher.PuncherConnClient):
 
 class P2pClient(object):
     def __init__(self, dodgy_p, server_ip, in_fd=None):
+        self.dodgy_p = dodgy_p
         self.fs = FileService(dodgy_p, in_fd)
         self.t_client = tracker.TrackerClient(dodgy_p.get_addr())
         self.my_id = self.t_client.join()
@@ -78,7 +79,7 @@ class P2pClient(object):
     def download(self, out_fd):
     
         if out_fd == None:
-            out_fd = open(dodgy_p.get_name(), "wb")
+            out_fd = open(self.dodgy_p.get_name(), "wb")
         
         download_indices = self.fs.get_incomplete_chunks()
         while len(download_indices) > 0:
