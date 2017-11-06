@@ -106,3 +106,5 @@ ENV/
 .idea/vcs.xml
 
 *.swp
+*.dodgy
+*.txt
