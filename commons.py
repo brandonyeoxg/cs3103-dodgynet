@@ -25,15 +25,17 @@ ascii_art_logo = """\
 def md5sum(fd):
     md5 = hashlib.md5()
     length = md5.block_size * 128
-    return md5sum_bytes(fd.read(length))
-
-def md5sum_bytes(bytes):
-    md5 = hashlib.md5()
-    for chunk in iter(lambda: bytes, b''):
+    for chunk in iter(lambda: fd.read(length), b''):
         md5.update(chunk)
     digest = md5.digest()
     logging.debug("Digest: %s" % md5.hexdigest())
     return digest
-
+    
+def md5sum_bytes(bytes):
+    md5 = hashlib.md5()
+    md5.update(bytes)
+    digest = md5.digest()
+    logging.debug("Digest: %s" % md5.hexdigest())
+    return digest
 
 # vim: expandtab shiftwidth=4 softtabstop=4 textwidth=80:

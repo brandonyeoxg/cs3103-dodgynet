@@ -204,9 +204,9 @@ class PuncherClient(protocol.TCPClient):
         if p.id != 0:
             logging.debug("Joined puncher network successfully, pub_ip=%s:%d" % p.get_addr())
             self.listener_client = PuncherClient(self.id, self.EndpointClient, self.addr)
-            listener_t = threading.Thread(target=self.listener_client.listen_forever)
-            listener_t.daemon = True
-            listener_t.start()
+            self.listener_t = threading.Thread(target=self.listener_client.listen_forever)
+            self.listener_t.daemon = True
+            self.listener_t.start()
         else:
             logging.fatal("Failed to join puncher network.")
     def connect_cached(self, target_id):

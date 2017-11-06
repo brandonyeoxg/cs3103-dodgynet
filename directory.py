@@ -6,7 +6,9 @@ from tabulate import tabulate
 import pickle
 import os
 import tracker
+import p2p
 import commons
+import math
 
 class DirCode(Enum):
     BYE = 0         
@@ -58,6 +60,8 @@ class DirPacket(ct.Structure):
         return protocol.cb2b(self.md5_digest)
     def __str__(self):
         return self.get_name()
+    def get_nchunks(self):
+        return int(math.ceil(self.file_size / p2p.CHUNK_SIZE))
 
 class DirServer(protocol.ThreadedTCPServer):
     def __init__(self, file_lookup={}, tracker_ip=PUB_IP, addr=('', PORT)):

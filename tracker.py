@@ -54,7 +54,6 @@ class TrackerHandler(protocol.Handler):
         peer = None
         while True:
             r = self.recv()
-            print(r)
             action = r.get_action()
             if action == TrackerCode.BYE:
                 logging.debug("Client says bye, we say bye back and quit!")
@@ -67,7 +66,7 @@ class TrackerHandler(protocol.Handler):
                 r.id = peer_id
                 self.send(r)
                 peer = self.add_peer(peer_id)
-                print(peer)
+                logging.debug("Peer: %s" % str(peer))
             elif action == TrackerCode.ANNOUNCE:
                 logging.debug("Client announces that it has a particular chunk_id=%d" % r.id)
                 if r.id in peer.chunk_ids:

@@ -33,6 +33,13 @@ def valid_addr(s):
         msg = "Not valid ip address and port!"
         raise argparse.ArgumentTypeError(msg)
 
+def block_forever(shutdown_fn):
+    try:
+        while True:
+            input()
+    except KeyboardInterrupt:
+        shutdown_fn()
+
 def main(arguments):
 
     parser = argparse.ArgumentParser(
@@ -101,21 +108,25 @@ def main(arguments):
             dir_client = directory.DirClient((args.server, directory.PORT))
             dodgy_p = dir_client.register(args.file, args.description)
             dir_client.bye()
+            if dodgy_p == None:
+                logging.info("Cannot upload new file, file already exist on the server.")
+                return
+
         if action == "seed":
+            logging.info("Loading the pickled file.")
             dodgy_p = pickle.load(args.dodgy_file)
 
-        # Now start seeding
-        logging.debug("Start seeding.")
-        tracker_client = tracker.TrackerClient(dodgy_p.get_addr())
-        my_id = tracker_client.join()
-        logging.info("Client joined with id=%d" % my_id)
-        # Now we start the puncher
-        puncher_client = puncher.PuncherClient(my_id, p2p.P2pEndpointClient, 
-            (args.server, puncher.PORT))
-        puncher_client.join()
+        p2p_client = p2p.P2pClient(dodgy_p, args.server, args.file)
+        p2p_client.upload()    
         
+        block_forever(p2p_client.shutdown)
+
     elif action == "download":
-        logging.debug("Download the specified file at %s" % args.dodgy_file)
+        logging.debug("Download the specified file at %s" % args.dodgy_file.name)
+        logging.info("Loading the pickled file at %s." % args.dodgy_file.name)
+        dodgy_p = pickle.load(args.dodgy_file)
+        p2p_client = p2p.P2pClient(dodgy_p, args.server)
+        p2p_client.download(args.out)
     else:
         logging.debug("For testing purposes!")
         '''
@@ -144,7 +155,7 @@ def main(arguments):
             print(peer_l)
             chunk_id = int(input("Enter a chunk[announce]:"))
         tracker_client.bye()
-''''''
+
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
 
