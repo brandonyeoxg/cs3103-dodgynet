@@ -31,18 +31,18 @@ d[p.get_name()] = p
 
 #https://stackoverflow.com/questions/12757884/python-multi-socketserver-work-in-same-time
 class Server(object):
-    def __init__(self, state_file):
+    def __init__(self, state_file, pub_ip):
         self.state_file = state_file
         try:
             state = pickle.load(open(state_file, "rb"))
             logging.debug("Loaded state file %s" % state_file)
-            self.dir_server = directory.DirServer(state['dir'])
+            self.dir_server = directory.DirServer(state['dir'], pub_ip)
         except (OSError, IOError) as e:
             logging.debug("No state file, starting afresh.")
             d = {}
-            self.dir_server = directory.DirServer(d)
-        self.puncher_server = puncher.PuncherServer()
-        self.puncher_conn_server = puncher.PuncherConnServer()
+            self.dir_server = directory.DirServer(d, pub_ip)
+        self.puncher_server = puncher.PuncherServer(pub_ip)
+        self.puncher_conn_server = puncher.PuncherConnServer(pub_ip)
     def serve_forever(self):
         self.puncher_server.serve_forever_nb()
         self.puncher_conn_server.serve_forever_nb()
@@ -65,10 +65,8 @@ def main(arguments):
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('server', help="Server to start, possible servers: %s" 
-            % ', '.join(possible_servers), 
-            type=str, choices=possible_servers, metavar='server', default='all',
-            const='all', nargs='?')
+    parser.add_argument('-s', '--server', help="Address of the server",
+        type=str, default="127.0.0.1")
     parser.add_argument('-sf', '--state_file', help="State file of the server"
             ", retrieve and save to.", default="server.state", type=str)
 
@@ -78,7 +76,7 @@ def main(arguments):
     logging.info("Welcome! Starting DodgyNet Server...")
     logging.debug("Starting server(s) with arguments %s" % str(args))
 
-    server = Server(args.state_file)
+    server = Server(args.state_file, args.server)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
