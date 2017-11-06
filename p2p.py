@@ -7,6 +7,7 @@ import math
 import random
 import pickle
 import tracker
+import protocol
 
 class P2pCode(Enum):
     REQUEST = 1
@@ -22,11 +23,10 @@ class P2pPacket(ct.Structure):
     def set_action(self, action):
         self.action = action.value
     def get_action(self):
-        return PuncherCode(self.action)
+        return P2pCode(self.action)
     def __str__(self):
-        return "%s:%s:%s" % (self.get_action(),
-            self.chunk_id,
-            str(self.id))
+        return "%s:%s" % (self.get_action(),
+            self.chunk_id)
     def set_md5(self, bytes):
         self.md5_digest = protocol.b2cb(bytes, 16)
     def get_md5(self):
@@ -35,18 +35,22 @@ class P2pPacket(ct.Structure):
         self.md5_digest = commons.md5sum_bytes(self.data)
     def check_md5(self):
         return self.md5_digest == commons.md5sum_bytes(self.data)
+    def set_data(self, bytes):
+        self.data = protocol.b2cb(bytes, CHUNK_SIZE)
+    def get_data(self):
+        return protocol.cb2b(self.data)
 
 class P2pEndpointClient(puncher.PuncherConnClient):
     def __init__(self, r, _id, server_addr=(puncher.PUB_IP, puncher.PORT)):
-        puncher.PuncherConnClient.__init__(r, _id, server_addr)
+        puncher.PuncherConnClient.__init__(self, r, _id, server_addr)
         self.set_type(self.addr, P2pPacket)
     def incoming_endpoint(self, p):
         logging.fatal("Endpoint, processing new packet.")
         if p.get_action() != P2pCode.REQUEST:
             logging.fatal("Cannot process anything else but request messages!")
 
-        p.data = self.fs.get_chunk(p.id)
-        p.set_action(P2pCode.ACTION)
+        p.set_data(self.fs.get_chunk(p.chunk_id))
+        p.set_action(P2pCode.DATA)
         
         return p
     @classmethod
@@ -55,10 +59,10 @@ class P2pEndpointClient(puncher.PuncherConnClient):
     def request(self, chunk_id):
         p = P2pPacket()
         p.set_action(P2pCode.REQUEST)
-        p.id = chunk_id
+        p.chunk_id = chunk_id
         self.send(p)
         p = self.recv()
-        self.fs.save_chunk(p.data, p.id)
+        self.fs.save_chunk(p.data, p.chunk_id)
 
 class P2pClient(object):
     def __init__(self, dodgy_p, server_ip, in_fd=None):
@@ -91,12 +95,9 @@ class P2pClient(object):
                 
                 # Now we announce
                 self.t_client.announce(chunk_id)
-                
-                time.sleep(1)
 
             download_indices = self.fs.get_incomplete_chunks()
-            print("[Endpoint] Incomplete Chunks %s" % str(download_indices))
-        self.mem_to_file(out_fd)
+        self.fs.mem_to_file(out_fd)
     def upload(self):
         n_chunks = self.fs.num_chunks
         logging.info("There are %d chunks in this file, announcing all of them." % n_chunks)
@@ -119,13 +120,11 @@ class FileService(object):
         else:
             self.file_to_mem(dodgy_p, fd)
     def file_to_mem(self, dodgy_p, fd):
-        for count in range(1, self.num_chunks+1):
-              self.total_chunks.append(count)
-              self.is_completed_chunks.append(True)
-
         self.file_mem = []
-        for chunk_num in self.total_chunks:
-            fd.seek(chunk_num * CHUNK_SIZE)
+        for count in range(self.num_chunks):
+            self.total_chunks.append(count)
+            self.is_completed_chunks.append(True)
+            fd.seek(count * CHUNK_SIZE)
             self.file_mem.append(fd.read(CHUNK_SIZE))
     def init_mem(self, dodgy_p):
         for count in range(1, self.num_chunks+1):
@@ -135,7 +134,7 @@ class FileService(object):
         self.file_mem = [bytes()] * self.num_chunks 
     def mem_to_file(self, fd):
         assert(self.get_incomplete_chunks() == [])
-        print(self.file_mem)
+        logging.info("Saving to file: %s" % fd.name)
         file_mem_contiguous = bytes()
         for ea_b in self.file_mem:
             file_mem_contiguous+= ea_b
@@ -143,10 +142,13 @@ class FileService(object):
         fd.write(file_mem_contiguous)
         fd.close()
     def save_chunk(self, data, chunk_num):
+        logging.debug("Save chunk_id=%d: %s" % (chunk_num, str(data)))
         self.file_mem[chunk_num-1] = data
         self.is_completed_chunks[chunk_num-1] = True
     def get_chunk(self, chunk_id):
-        return self.file_mem[chunk_id-1]
+        data = self.file_mem[chunk_id-1]
+        logging.debug("Get chunk_id=%d: %s" % (chunk_id, str(data)))
+        return data
     def get_incomplete_chunks(self):
         incomplete_indices = []
         for i,is_complete in zip(self.total_chunks, self.is_completed_chunks):
