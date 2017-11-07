@@ -128,33 +128,8 @@ def main(arguments):
         p2p_client = p2p.P2pClient(dodgy_p, args.server)
         p2p_client.download(args.out)
     else:
-        logging.debug("For testing purposes!")
-        '''
-        print("TEST-stubbed")
-        puncher_client = puncher.PuncherClient(args.id, puncher.PuncherConnClient, (args.server, puncher.PORT))
-        puncher_client.join()
-        target_id = int(input("Enter a target:"))
-        while target_id != 0:
-            c = puncher_client.connect_cached(target_id)
-            if c == None:
-                logging.fatal("Cannot connect to id=%d", target_id)
-            else:
-                c.send(puncher.PuncherPacket())
-                print(c.recv())
-            target_id = int(input("Enter a target:"))
-        puncher_client.bye()
-        '''
-        tracker_client = tracker.TrackerClient(('127.0.0.1', 50147))
-        _id = tracker_client.join()
-        logging.info("Joined with id=%d" % _id)
-        chunk_id = int(input("Enter a chunk[announce]:"))
-        while chunk_id != 0:
-            tracker_client.announce(chunk_id)
-            chunk_id = int(input("Enter a chunk[want]:"))
-            peer_l = tracker_client.want(chunk_id)
-            print(peer_l)
-            chunk_id = int(input("Enter a chunk[announce]:"))
-        tracker_client.bye()
+        parser.print_help()
+        sys.exit(1)
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv[1:]))
