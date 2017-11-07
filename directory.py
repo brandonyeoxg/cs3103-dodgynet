@@ -167,6 +167,7 @@ class DirHandler(protocol.Handler):
             elif action == DirCode.LIST:
                 logging.debug("Client wants the listing of files!")
                 for f in self.server.file_lookup.values():
+                    f.npeers = self.server.tracker_lookup[f.port].peer_lookup
                     logging.debug("Sending file record: %s" % str(f))
                     self.send(f)
                 logging.debug("Sending the empty record to signal end!")
