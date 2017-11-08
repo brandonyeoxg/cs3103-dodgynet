@@ -1,1 +1,0 @@
-./dodgynet --debug --server ec2-13-228-183-203.ap-southeast-1.compute.amazonaws.com seed "L5- Socket Programming.pdf.dodgy" "L5- Socket Programming.pdf"
